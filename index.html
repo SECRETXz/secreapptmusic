@@ -618,7 +618,7 @@ setInterval(()=>{ if(user && !au.paused){ PF.secs+=5; savePF(); } },5000);
 /* ---------- ลืมรหัสผ่าน + OTP ---------- */
 /* ตั้งค่าส่งอีเมลผ่าน EmailJS (emailjs.com) — ถ้าเว้นว่างไว้ จะเป็น "โหมดทดสอบ" แสดงรหัส OTP บนหน้าจอแทน
    เทมเพลตอีเมลใช้ตัวแปร {{to_email}} {{otp}} {{username}} {{minutes}} */
-const MAIL = { publicKey:"", serviceId:"service_rwz0vqb", templateId:"" };
+const MAIL = { publicKey:"", serviceId:"service_y689cqh", templateId:"" };
 /* ถ้ามี backend OTP (โฟลเดอร์ otp-server) ใส่ URL ตรงนี้ เช่น "https://otp.example.com" — จะใช้ backend ก่อนเสมอ */
 const OTP_API = "";
 async function api(path, body){ let r; try{ r = await fetch(OTP_API+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }catch(e){ throw "เชื่อมต่อเซิร์ฟเวอร์ OTP ไม่ได้"; }
