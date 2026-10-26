@@ -1,0 +1,1189 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SecretX Music</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap">
+<style>
+/* Layout: three zones. Library sidebar, scrolling stage, and a persistent player bar. On phones the sidebar becomes bottom tabs. */
+:root {
+  --bg: #0b0c11;
+  --panel: #13151c;
+  --raise: #1b1e28;
+  --line: #292d3b;
+  --fg: #f1f0ec;
+  --mute: #9096a8;
+  --accent: #3b8cff;
+  --accent-ink: #04122b;
+  --hue: 215;
+  --display: 'Bricolage Grotesque', 'IBM Plex Sans Thai', system-ui, sans-serif;
+  --body: 'IBM Plex Sans Thai', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.5 var(--body);
+  overflow: hidden;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, .row:focus-visible, input:focus-visible, .tile:focus-visible, .card:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+h1, h2, h3, p { margin: 0; }
+h1, h2 { font-family: var(--display); text-wrap: balance; letter-spacing: -0.015em; }
+
+#app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 252px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: "side main" "bar bar";
+  gap: 8px;
+  padding-block: 8px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.panel { background: var(--panel); border-radius: 12px; min-width: 0; }
+
+/* sidebar */
+.side { grid-area: side; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.top { padding: 14px 12px 8px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 12px 12px; font: 800 20px/1 var(--display); letter-spacing: -0.02em; }
+.brand .mark { display: flex; align-items: flex-end; gap: 2px; height: 18px; }
+.brand .mark i { width: 3px; background: var(--accent); border-radius: 1px; display: block; }
+.brand .mark i:nth-child(1) { height: 8px; } .brand .mark i:nth-child(2) { height: 18px; } .brand .mark i:nth-child(3) { height: 12px; } .brand .mark i:nth-child(4) { height: 15px; }
+.nl { display: flex; align-items: center; gap: 14px; width: 100%; padding: 10px 12px; border: 0; background: none; border-radius: 8px; color: var(--mute); font-weight: 600; text-align: left; }
+.nl:hover, .nl.on { color: var(--fg); }
+.nl.on { background: var(--raise); }
+.libp { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.libh { display: flex; align-items: center; gap: 10px; padding: 14px 20px 8px; color: var(--mute); font-weight: 600; }
+.libh span { flex: 1; }
+.libh button { border: 0; background: none; color: var(--mute); display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; }
+.libh button:hover { color: var(--fg); background: var(--raise); }
+.lib { overflow-y: auto; padding: 0 8px 8px; flex: 1; }
+.li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 12px; align-items: center; width: 100%; padding: 8px; border: 0; border-radius: 8px; background: none; text-align: left; }
+.li:hover, .li.on { background: var(--raise); }
+.li strong { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.li small { color: var(--mute); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cv { display: block; width: 100%; aspect-ratio: 1; border-radius: 6px; background-size: cover; background-position: center; background-color: var(--raise); }
+.cv.heart { display: grid; place-items: center; background: linear-gradient(135deg, #5b3df0, #d6a3ff); color: #fff; }
+.cv.files { display: grid; place-items: center; background: linear-gradient(135deg, #1f6f5c, #88e0b4); color: #06241b; }
+
+/* stage */
+.main {
+  grid-area: main; overflow-y: auto; overflow-x: hidden; min-height: 0;
+  padding: 24px clamp(16px, 3vw, 32px) 32px;
+  background: linear-gradient(180deg, hsl(var(--hue) 38% 17%) 0, var(--panel) 340px);
+  transition: background .6s;
+}
+.kicker { color: var(--mute); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+.hello h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 800; line-height: 1.15; margin-top: 4px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; margin: 22px 0 30px; }
+.tile { position: relative; display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: center; gap: 12px; padding: 0 12px 0 0; height: 56px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--fg) 8%, transparent); text-align: left; overflow: hidden; }
+.tile:hover { background: color-mix(in srgb, var(--fg) 15%, transparent); }
+.tile .cv { height: 56px; width: 56px; border-radius: 0; aspect-ratio: auto; }
+.tile strong { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sec-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 8px 0 10px; }
+.sec-h h2 { font-size: 22px; font-weight: 800; }
+.sec-h span { color: var(--mute); font-size: 13px; }
+.note { margin-top: 28px; padding: 14px 16px; border: 1px dashed var(--line); border-radius: 10px; color: var(--mute); font-size: 13px; max-width: 62ch; }
+.note b { color: var(--fg); font-weight: 600; }
+
+.phead { display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap; }
+.phead .cv { width: clamp(120px, 22vw, 200px); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .45); flex: none; }
+.phead .txt { min-width: 0; flex: 1 1 240px; }
+.phead h1 { font-size: clamp(30px, 6vw, 56px); font-weight: 800; line-height: 1.1; margin: 4px 0 8px; }
+.phead .desc { color: var(--mute); max-width: 56ch; }
+.phead .meta { margin-top: 8px; font-size: 13px; color: var(--mute); }
+.acts { display: flex; align-items: center; gap: 14px; margin: 22px 0 14px; }
+.big { width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; transition: transform .12s; }
+.big:hover { transform: scale(1.05); }
+.ghost { height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid var(--line); background: none; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; }
+.ghost:hover { border-color: var(--mute); }
+
+.list { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: 36px minmax(0, 1fr) minmax(0, 0.7fr) 32px 48px; align-items: center; gap: 12px; padding: 6px 12px 6px 8px; border-radius: 8px; cursor: pointer; }
+.row:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.row .idx { text-align: center; color: var(--mute); position: relative; height: 18px; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+.row .who { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; align-items: center; min-width: 0; }
+.row .tt { min-width: 0; }
+.row .tt strong { display: block; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .tt small { display: block; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .alb { color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+.row time { color: var(--mute); text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+.like { border: 0; background: none; color: var(--mute); width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; }
+.row .like { opacity: 0; }
+.row:hover .like, .row .like[aria-pressed="true"], .row .like:focus-visible { opacity: 1; }
+.like:hover { color: var(--fg); }
+.like[aria-pressed="true"] { color: var(--accent); }
+.row.is-cur .tt strong, .row.is-cur .idx { color: var(--accent); }
+.eq { display: none; align-items: flex-end; gap: 2px; height: 14px; }
+.eq i { width: 3px; background: var(--accent); border-radius: 1px; height: 4px; display: block; }
+.row.is-playing .idx b { display: none; }
+.row.is-playing .eq { display: flex; }
+.row.is-playing .eq i { animation: bounce .9s ease-in-out infinite; }
+.row.is-playing .eq i:nth-child(2) { animation-delay: -.3s; }
+.row.is-playing .eq i:nth-child(3) { animation-delay: -.6s; }
+@keyframes bounce { 0%, 100% { height: 3px; } 50% { height: 14px; } }
+
+.empty { padding: 40px 16px; text-align: center; color: var(--mute); border: 1px dashed var(--line); border-radius: 12px; }
+.empty strong { display: block; color: var(--fg); font-family: var(--display); font-size: 18px; margin-bottom: 4px; }
+.drop { margin: 18px 0; padding: 28px 16px; text-align: center; border: 1.5px dashed var(--line); border-radius: 12px; color: var(--mute); }
+.drop.over { border-color: var(--accent); color: var(--fg); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.drop strong { color: var(--fg); display: block; font-family: var(--display); font-size: 18px; margin-bottom: 4px; }
+
+.search { display: flex; align-items: center; gap: 10px; max-width: 460px; height: 46px; padding: 0 16px; border-radius: 23px; background: var(--raise); border: 1px solid var(--line); margin: 6px 0 22px; }
+.search input { flex: 1; min-width: 0; background: none; border: 0; color: var(--fg); font: inherit; font-size: 15px; outline: none; }
+.search:focus-within { border-color: var(--accent); }
+.search svg { color: var(--mute); flex: none; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr)); gap: 16px; }
+.card { border: 0; background: color-mix(in srgb, var(--fg) 5%, transparent); border-radius: 10px; padding: 12px; text-align: left; display: block; width: 100%; min-width: 0; }
+.card:hover { background: color-mix(in srgb, var(--fg) 11%, transparent); }
+.card .cv { margin-bottom: 10px; border-radius: 8px; }
+.card strong { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card small { color: var(--mute); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* player bar */
+.bar {
+  grid-area: bar; padding: 10px 16px; background: var(--panel); border-radius: 12px;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 540px) minmax(0, 1fr);
+  grid-template-areas: "np ctl vol" "np seek vol"; align-items: center; column-gap: 20px; row-gap: 2px;
+}
+.np { grid-area: np; display: grid; grid-template-columns: 52px minmax(0, 1fr) 32px; gap: 12px; align-items: center; min-width: 0; }
+.np .cv { width: 52px; }
+.np .tt { min-width: 0; }
+.np strong { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np small { display: block; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctl { grid-area: ctl; display: flex; justify-content: center; align-items: center; gap: 10px; }
+.ib { width: 36px; height: 36px; border: 0; background: none; border-radius: 50%; color: var(--mute); display: grid; place-items: center; position: relative; }
+.ib:hover { color: var(--fg); }
+.ib.on { color: var(--accent); }
+.ib.on::after { content: ""; position: absolute; bottom: 2px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--accent); }
+.ib.main-btn { width: 40px; height: 40px; background: var(--fg); color: var(--bg); }
+.ib.main-btn:hover { transform: scale(1.06); color: var(--bg); }
+.ib .one { position: absolute; font: 700 8px/1 var(--body); top: 11px; left: 50%; margin-left: -2px; }
+.seek { grid-area: seek; display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px; gap: 8px; align-items: center; color: var(--mute); font-size: 12px; font-variant-numeric: tabular-nums; }
+.seek time:first-child { text-align: right; }
+.vol { grid-area: vol; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.vol .rng { width: 110px; }
+.rng { -webkit-appearance: none; appearance: none; background: transparent; height: 16px; width: 100%; margin: 0; cursor: pointer; --p: 0%; }
+.rng::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--fg) var(--p), var(--line) var(--p)); }
+.rng:hover::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--accent) var(--p), var(--line) var(--p)); }
+.rng::-moz-range-track { height: 4px; border-radius: 2px; background: var(--line); }
+.rng::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--fg); }
+.rng:hover::-moz-range-progress { background: var(--accent); }
+.rng::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--fg); margin-top: -4px; opacity: 0; }
+.rng::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--fg); opacity: 0; }
+.rng:hover::-webkit-slider-thumb, .rng:focus-visible::-webkit-slider-thumb { opacity: 1; }
+.rng:hover::-moz-range-thumb, .rng:focus-visible::-moz-range-thumb { opacity: 1; }
+@media (hover: none) { .rng::-webkit-slider-thumb { opacity: 1; } .rng::-moz-range-thumb { opacity: 1; } .row .like { opacity: 1; } }
+
+.navm { grid-area: nav; display: none; }
+.toast { position: fixed; left: 50%; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 10px); background: var(--fg); color: var(--bg); padding: 10px 18px; border-radius: 22px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100% - 32px); z-index: 20; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.row.hit { grid-template-columns: 36px minmax(0, 1fr) minmax(0, 0.7fr) 32px; color: inherit; text-decoration: none; }
+.open { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--line); border-radius: 15px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.row.hit { cursor: pointer; }
+.row.is-loading .idx b { opacity: .35; }
+.opens { display: flex; gap: 6px; }
+.open { color: var(--fg); text-decoration: none; }
+.open:hover { border-color: var(--accent); color: var(--accent); }
+.hint { color: var(--mute); font-size: 13px; margin: -2px 0 10px; max-width: 62ch; }
+.hits { margin-bottom: 26px; }
+@media (max-width: 900px) {
+  #app { grid-template-columns: 200px minmax(0, 1fr); }
+  .row { grid-template-columns: 36px minmax(0, 1fr) 32px 48px; }
+  .row.hit { grid-template-columns: 36px minmax(0, 1fr) 32px; }
+  .row .alb { display: none; }
+  .vol .rng { width: 80px; }
+}
+@media (max-width: 760px) {
+  #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto auto; grid-template-areas: "main" "bar" "nav"; gap: 6px; }
+  .side { display: none; }
+  .navm { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--panel); border-radius: 12px; padding: 4px; }
+  .navm button { border: 0; background: none; color: var(--mute); display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; font-size: 11px; font-weight: 600; border-radius: 8px; }
+  .navm button.on { color: var(--fg); }
+  .bar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "np ctl" "seek seek"; column-gap: 8px; padding: 8px 12px; }
+  .bar .opt, .vol { display: none; }
+  .ctl { gap: 2px; }
+  .seek { grid-template-columns: 36px minmax(0, 1fr) 36px; }
+  .main { padding-top: 18px; }
+  .toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .row.is-playing .eq i { animation: none; height: 10px; }
+  .main, .toast, .big { transition: none; }
+}
+:root { --logo: url("data:image/webp;base64,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"); }
+.brand .mark { width: 38px; height: 38px; border-radius: 10px; background: var(--logo) center / cover; box-shadow: 0 0 14px rgba(40,120,255,.55); flex: none; }
+.brand .mark i { display: none; }
+.hello { position: relative; }
+.hello h1 { padding-right: 96px; }
+.hello::after { content: ''; position: absolute; right: 0; top: 0; width: 84px; height: 84px; border-radius: 20px; background: var(--logo) center / cover; box-shadow: 0 0 30px rgba(40,120,255,.5); }
+@media (max-width: 760px) { .hello::after { width: 60px; height: 60px; border-radius: 15px; } .hello h1 { padding-right: 72px; } }
+.row .like { opacity: .6; }
+.row .like:hover { opacity: 1; }
+</style>
+
+<div id="app">
+  <aside class="side">
+    <nav class="panel top" aria-label="เมนูหลัก">
+      <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>SecretX Music</div>
+      <div id="nav"></div>
+    </nav>
+    <section class="panel libp" aria-label="ไลบรารี">
+      <div class="libh"><span>ไลบรารีของคุณ</span><button type="button" id="addBtn" aria-label="เพิ่มไฟล์เพลงของคุณ" title="เพิ่มไฟล์เพลง"></button></div>
+      <div class="lib" id="lib"></div>
+    </section>
+  </aside>
+
+  <main class="main panel" id="main" tabindex="-1"></main>
+
+  <footer class="bar" aria-label="เครื่องเล่นเพลง">
+    <div class="np">
+      <i class="cv" id="npCover"></i>
+      <div class="tt"><strong id="npTitle">ยังไม่ได้เลือกเพลง</strong><small id="npArtist">กดเล่นเพลงใดก็ได้เพื่อเริ่ม</small></div>
+      <button type="button" class="like" id="npLike" aria-label="ถูกใจเพลงนี้" aria-pressed="false"></button>
+    </div>
+    <div class="ctl">
+      <button type="button" class="ib opt" id="bShuffle" aria-label="สุ่มเพลง" aria-pressed="false"></button>
+      <button type="button" class="ib" id="bPrev" aria-label="เพลงก่อนหน้า"></button>
+      <button type="button" class="ib main-btn" id="bPlay" aria-label="เล่น"></button>
+      <button type="button" class="ib" id="bNext" aria-label="เพลงถัดไป"></button>
+      <button type="button" class="ib opt" id="bRepeat" aria-label="เล่นซ้ำ: ปิด" aria-pressed="false"></button>
+    </div>
+    <div class="seek">
+      <time id="tCur">0:00</time>
+      <input class="rng" id="seek" type="range" min="0" max="1000" value="0" aria-label="ตำแหน่งเพลง">
+      <time id="tDur">0:00</time>
+    </div>
+    <div class="vol">
+      <button type="button" class="ib" id="bMute" aria-label="ปิดเสียง"></button>
+      <input class="rng" id="vol" type="range" min="0" max="100" value="80" aria-label="ระดับเสียง">
+    </div>
+  </footer>
+
+  <nav class="navm" id="navm" aria-label="เมนูหลัก"></nav>
+</div>
+<input type="file" id="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac,.opus" multiple hidden>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------- icons ---------- */
+const ST = p => '<g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + p + '</g>';
+const ICONS = {
+  home: '<path d="M12 3 3 10.5V21h6.5v-6h5v6H21V10.5z"/>',
+  search: ST('<circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.9-4.9"/>'),
+  lib: '<path d="M4 4h2.5v16H4zm5 0h2.5v16H9zm4.6.6 2.4-.6 4 15.4-2.4.6z"/>',
+  play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.9l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 7 4.5z"/>',
+  pause: '<path d="M6 4h4v16H6zm8 0h4v16h-4z"/>',
+  prev: '<path d="M6 5h2.5v14H6zm3.5 7 10-7v14z"/>',
+  next: '<path d="M15.5 5H18v14h-2.5zM14.5 12l-10 7V5z"/>',
+  shuffle: ST('<path d="M3 7h3c5 0 6 10 11 10h4M3 17h3c1.5 0 2.6-.6 3.5-1.6M21 7h-4c-1.5 0-2.6.6-3.5 1.6M18 4l3 3-3 3M18 14l3 3-3 3"/>'),
+  repeat: ST('<path d="M17 3l3 3-3 3M4 11V9a3 3 0 0 1 3-3h13M7 21l-3-3 3-3M20 13v2a3 3 0 0 1-3 3H4"/>'),
+  heart: ST('<path d="M12 20.5S3.5 15 3.5 8.8A4.8 4.8 0 0 1 12 6.2a4.8 4.8 0 0 1 8.5 2.6C20.5 15 12 20.5 12 20.5z"/>'),
+  heartfill: '<path d="M12 20.5S3.5 15 3.5 8.8A4.8 4.8 0 0 1 12 6.2a4.8 4.8 0 0 1 8.5 2.6C20.5 15 12 20.5 12 20.5z"/>',
+  vol: '<path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z"/>' + ST('<path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12"/>'),
+  mute: '<path d="M4 9.5v5h3.5L12 19V5L7.5 9.5z"/>' + ST('<path d="m16 9.5 5 5m0-5-5 5"/>'),
+  plus: '<path d="M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z"/>',
+  note: '<path d="M9 4v11.3a3.5 3.5 0 1 0 2 3.2V8l8-1.8v6.1a3.5 3.5 0 1 0 2 3.2V3z"/>',
+  ext: ST('<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>'),
+  upload: ST('<path d="M12 16V4m0 0-4.5 4.5M12 4l4.5 4.5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/>')
+};
+const ic = (n, s) => '<svg width="' + (s || 20) + '" height="' + (s || 20) + '" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' + ICONS[n] + '</svg>';
+
+/* ---------- seeded helpers and generated covers ---------- */
+function hash(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const coverCache = {};
+function cover(key) {
+  if (coverCache[key]) return coverCache[key];
+  const r = rng(hash(key));
+  const h1 = Math.floor(r() * 360), h2 = (h1 + 50 + Math.floor(r() * 110)) % 360, kind = Math.floor(r() * 4);
+  let g = '';
+  if (kind === 0) { const cx = 30 + r() * 40, cy = 30 + r() * 40; for (let i = 1; i <= 5; i++) g += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="' + (i * 11) + '" fill="none" stroke="#fff" stroke-opacity="' + (0.34 - i * 0.05).toFixed(2) + '" stroke-width="2"/>'; }
+  else if (kind === 1) { for (let i = 0; i < 5; i++) { const y = 28 + i * 14, a = 4 + r() * 6, ph = r() * 6; let d = 'M0 ' + y; for (let x = 0; x <= 100; x += 5) d += ' L' + x + ' ' + (y + Math.sin(x / 100 * 6.28 + ph) * a).toFixed(1); g += '<path d="' + d + '" fill="none" stroke="#fff" stroke-opacity=".38" stroke-width="2.4"/>'; } }
+  else if (kind === 2) { g += '<circle cx="50" cy="44" r="' + (16 + r() * 8).toFixed(1) + '" fill="#fff" fill-opacity=".85"/>'; for (let i = 0; i < 4; i++) g += '<rect x="0" y="' + (62 + i * 8) + '" width="100" height="' + (2 + i) + '" fill="#000" fill-opacity=".28"/>'; }
+  else { for (let i = -2; i < 9; i++) g += '<path d="M' + (i * 14) + ' 100 L' + (i * 14 + 50) + ' 0" stroke="#fff" stroke-opacity="' + (0.1 + r() * 0.22).toFixed(2) + '" stroke-width="' + (3 + r() * 6).toFixed(1) + '"/>'; }
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(' + h1 + ',70%,52%)"/><stop offset="1" stop-color="hsl(' + h2 + ',72%,28%)"/></linearGradient></defs><rect width="100" height="100" fill="url(#g)"/>' + g + '</svg>';
+  return coverCache[key] = "url('data:image/svg+xml," + encodeURIComponent(svg).replace(/'/g, '%27') + "')";
+}
+const hueOf = key => hash(key) % 360;
+
+/* ---------- catalogue (every demo track is synthesised live) ---------- */
+const SCALES = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11], dorian: [0, 2, 3, 5, 7, 9, 10], lydian: [0, 2, 4, 6, 7, 9, 11], penta: [0, 2, 4, 7, 9] };
+const KITS = {
+  lofi:    { k: [0, 10], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14], hv: .22, bass: [0, 6, 10] },
+  drive:   { k: [0, 4, 8, 12], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14], hv: .26, bass: [0, 2, 4, 6, 8, 10, 12, 14] },
+  soft:    { k: [0, 8], s: [], h: [2, 6, 10, 14], hv: .14, bass: [0, 8] },
+  minimal: { k: [0, 8], s: [], h: [2, 6, 10, 14], hv: .2, bass: [0, 6, 8] },
+  bright:  { k: [0, 6, 8, 12], s: [4, 12], h: [0, 2, 4, 6, 8, 10, 12, 14], hv: .24, bass: [0, 3, 6, 8, 11, 14] }
+};
+const T = (id, title, artist, tag, bpm, root, scale, wave, kit, prog, extra) => Object.assign({ id, title, artist, tag, bpm, root, scale, wave, kit, prog, bars: 32, swing: 0, dens: 1, bright: 2600, leadFrom: 4, seed: hash(id) % 99991 }, extra || {});
+const TRACKS = [
+  T('t1', 'ถนนสายเงียบ', 'ปลายฝน', 'Lo-fi ฝนพรำ', 84, 57, 'minor', 'triangle', 'lofi', [0, 5, 3, 4], { swing: .2, dens: .8, bright: 1800 }),
+  T('t2', 'ร้านกาแฟหลังฝน', 'ปลายฝน', 'Lo-fi ฝนพรำ', 78, 62, 'dorian', 'triangle', 'lofi', [0, 3, 5, 4], { swing: .22, dens: .75, bright: 1700 }),
+  T('t3', 'ชานเรือน', 'Mali Tape', 'Lo-fi ฝนพรำ', 88, 60, 'major', 'triangle', 'lofi', [0, 4, 5, 3], { swing: .18, dens: .85, bright: 2000 }),
+  T('t4', 'Neon Lanna', 'Night Bureau', 'ขับรถกลางคืน', 108, 55, 'minor', 'sawtooth', 'drive', [0, 5, 2, 6], { dens: 1.05, bright: 2400 }),
+  T('t5', 'สะพานพระราม 9', 'Night Bureau', 'ขับรถกลางคืน', 116, 57, 'dorian', 'square', 'drive', [0, 3, 0, 4], { bright: 2000, dens: .95 }),
+  T('t6', 'Midnight Rangsit', 'Kaew & Radio', 'ขับรถกลางคืน', 100, 52, 'minor', 'sawtooth', 'drive', [0, 2, 5, 4], { bright: 2200, dens: .9 }),
+  T('t7', 'ระนาดยามเย็น', 'วงเสียงใส', 'ไทยเดิมเรียบ ๆ', 72, 60, 'penta', 'triangle', 'soft', [0, 2, 1, 3], { dens: 1.1, bright: 3200 }),
+  T('t8', 'ทุ่งรวงทอง', 'วงเสียงใส', 'ไทยเดิมเรียบ ๆ', 66, 62, 'penta', 'sine', 'soft', [0, 3, 2, 4], { dens: .9, bright: 3000 }),
+  T('t9', 'Deep Work 25', 'Stillform', 'โฟกัสงาน', 96, 57, 'lydian', 'sine', 'minimal', [0, 1, 3, 1], { dens: .7, bright: 2200 }),
+  T('t10', 'คลื่นสมอง', 'Stillform', 'โฟกัสงาน', 90, 55, 'dorian', 'triangle', 'minimal', [0, 4, 3, 5], { dens: .65, bright: 1900 }),
+  T('t11', 'แสงแรกเหนือคลอง', 'Sunrise Co.', 'ตื่นเช้า', 112, 60, 'major', 'square', 'bright', [0, 4, 5, 3], { dens: 1, bright: 2600 }),
+  T('t12', 'ตลาดเช้า', 'Sunrise Co.', 'ตื่นเช้า', 120, 62, 'lydian', 'triangle', 'bright', [0, 3, 1, 4], { dens: 1.1, bright: 3000 })
+];
+const PLAYLISTS = [
+  { id: 'p1', name: 'Lo-fi ฝนพรำ', desc: 'จังหวะเนิบๆ เสียงอุ่น เหมาะกับวันที่ฝนตกนอกหน้าต่าง', ids: ['t1', 't2', 't3'] },
+  { id: 'p2', name: 'ขับรถกลางคืน', desc: 'ซินธ์ไซส์และกลองหนักแน่นสำหรับถนนโล่งตอนดึก', ids: ['t4', 't5', 't6'] },
+  { id: 'p3', name: 'ไทยเดิมเรียบ ๆ', desc: 'ทำนองห้าเสียงที่ได้กลิ่นระนาด ปรับให้ฟังสบายแบบสมัยใหม่', ids: ['t7', 't8'] },
+  { id: 'p4', name: 'โฟกัสงาน', desc: 'จังหวะนิ่ง ทำนองน้อย ไม่แย่งความสนใจ', ids: ['t9', 't10'] },
+  { id: 'p5', name: 'ตื่นเช้า', desc: 'สดใสพอให้ลุกจากเตียงได้', ids: ['t11', 't12'] }
+];
+
+/* popular songs: metadata only, opened on Spotify (not playable in-app) */
+const HITS = [
+  { title: "อย่ามากกว่าฉันก็พอ (Jealous)", artist: "GAVIN:D", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "ได้แค่เดินมาส่ง (The Last Walk)", artist: "GAVIN:D & BLVCKHEART", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "ขึ้นใจ (3am call)", artist: "Mirrr & BLVCKHEART", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "เขียว เหลือง แดง (Get high)", artist: "PUN & THE TOYS", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "เมื่อไหร่จะมี (มีใจให้กัน)", artist: "BLVCKHEART", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "Living Death", artist: "PUN", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "กลัวว่าฉันจะไม่เสียใจ (Fear)", artist: "PURPEECH", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "ไม่รักดีกว่า", artist: "Z9", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "เมื่อถูกค้นพบ (Finally She Found.)", artist: "FREEHAND", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "SWIM SWIM", artist: "BTS", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "สายไป", artist: "9tokyo & BLVCKHEART", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "รักให้เธอได้รู้ (Proof.)", artist: "PUN", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "นาฬิกาทราย (sign)", artist: "BOWKYLION", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "ฝากให้เขารัก", artist: "Yes'sir Days", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "กลัวความเสียใจ", artist: "Saran & Pearpilincys", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "Bby Wow", artist: "Karol G, Judeline & Rusowsky", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "Been By Now", artist: "Morgan Wallen", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "Petal", artist: "Ariana Grande", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "Boston", artist: "Stella Lefty", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "Honeybee", artist: "Drake", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "Stupid Song", artist: "Olivia Rodrigo", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "I Knew It, I Knew You", artist: "Taylor Swift", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "Hate That I Made You Love Me", artist: "Ariana Grande", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "The Cure", artist: "Olivia Rodrigo", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "Dracula", artist: "Tame Impala & Jennie", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "I Can't Love You Anymore", artist: "Ella Langley & Morgan Wallen", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "Drop Dead", artist: "Olivia Rodrigo", th: false, src: "Billboard Hot 100 ท็อป 10" },
+  { title: "ความรัก", artist: "bodyslam", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "รักมือสอง", artist: "Bedroom Audio", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "คำยินดี", artist: "Klear", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "ถามเพื่ออะไร", artist: "KLEAR", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "ดาวตก (Wish)", artist: "WANYAi & Z9", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "อยากจะกอดเธอนาน ๆ (HAVE A GOOD TIME)", artist: "BLVCKHEART", th: true, src: "ชาร์ต Spotify ไทย" },
+  { title: "นับหนึ่ง (From now on)", artist: "BILLKIN", th: true, src: "ชาร์ตวิทยุไทย" },
+  { title: "แนบใจ", artist: "Playground", th: true, src: "ชาร์ตวิทยุไทย" },
+  { title: "ของขวัญปีใหม่ (Golden Night)", artist: "Jeff Satur", th: true, src: "ชาร์ตวิทยุไทย" },
+  { title: "ยังรักอยู่ไหม (Stars.)", artist: "BUS", th: true, src: "ชาร์ตวิทยุไทย" },
+  { title: "วิงวอน", artist: "BOWKYLION", th: true, src: "ชาร์ตเพลงไทย" },
+  { title: "นี่คือรักแท้ใช่ไหม", artist: "นนท์ ธนนท์", th: true, src: "ชาร์ตเพลงไทย" },
+  { title: "โคจรด้วยรัก", artist: "Goy Arachaporn", th: true, src: "ชาร์ตเพลงไทย" },
+  { title: "ลังเล", artist: "PP Krit", th: true, src: "ชาร์ตเพลงไทย" },
+  { title: "ขอโทษละกัน (friend to friend)", artist: "PP Krit", th: true, src: "ชาร์ตเพลงไทย" },
+  { title: "Comedy", artist: "Jeff Satur", th: true, src: "ชาร์ตเพลงไทย" },
+  { title: "LEMONADE", artist: "aespa", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "Come Over", artist: "BTS", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "Do your dance", artist: "RIIZE", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "SWEAT", artist: "KISS OF LIFE", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "Less than a Lover", artist: "JENNIE", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "Surfin' Boy", artist: "Red Velvet", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "Alone", artist: "Mark Tuan", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "Sunflower", artist: "Post Malone & Swae Lee", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "Man I Need", artist: "Olivia Dean", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "Opalite", artist: "Taylor Swift", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "WHERE IS MY HUSBAND!", artist: "RAYE", th: false, src: "ชาร์ตไทย · สากล/K-pop" },
+  { title: "Blinding Lights", artist: "The Weeknd", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "Shape of You", artist: "Ed Sheeran", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "As It Was", artist: "Harry Styles", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "bad guy", artist: "Billie Eilish", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "Levitating", artist: "Dua Lipa", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "Someone You Loved", artist: "Lewis Capaldi", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "Die With A Smile", artist: "Lady Gaga & Bruno Mars", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "APT.", artist: "ROSÉ & Bruno Mars", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "Espresso", artist: "Sabrina Carpenter", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "Not Like Us", artist: "Kendrick Lamar", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "Cruel Summer", artist: "Taylor Swift", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "Dynamite", artist: "BTS", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "How You Like That", artist: "BLACKPINK", th: false, src: "เพลงฮิตตลอดกาล" },
+  { title: "Super Shy", artist: "NewJeans", th: false, src: "เพลงฮิตตลอดกาล" }
+];
+HITS.forEach((h, i) => { h.id = 'h' + i; h.tag = h.src; h.remote = true; h.file = null; h.dur = 30; });
+const REG = {};
+const spUrl = h => 'https://open.spotify.com/search/' + encodeURIComponent(h.title + ' ' + h.artist);
+
+/* ---------- synth engine (Web Audio) ---------- */
+const planCache = {};
+function makePlan(t) {
+  if (planCache[t.id]) return planCache[t.id];
+  const sc = SCALES[t.scale], n = sc.length, kit = KITS[t.kit], bars = t.bars;
+  const deg = d => t.root + sc[((d % n) + n) % n] + 12 * Math.floor(d / n);
+  const chords = [], bassNote = [], lead = new Array(bars * 16).fill(null);
+  for (let b = 0; b < bars; b++) { const d = t.prog[b % t.prog.length]; chords.push([deg(d), deg(d + 2), deg(d + 4)]); bassNote.push(deg(d) - 12); }
+  for (let b = t.leadFrom; b < bars - 2; b++) {
+    const r = rng(t.seed + (b % 4) * 101 + (((b / 8) | 0) % 2) * 7);
+    let cur = t.prog[b % t.prog.length] + [0, 2, 4][(r() * 3) | 0] + n, prev = null, ps = 0;
+    for (let s = 0; s < 16; s++) {
+      const base = s % 4 === 0 ? .7 : (s % 2 === 0 ? .4 : .14);
+      if (r() < base * t.dens) {
+        cur += [-2, -1, -1, 0, 1, 1, 2][(r() * 7) | 0];
+        cur = Math.max(n - 2, Math.min(n * 2 + 2, cur));
+        if (prev) prev.l = Math.max(1, Math.min(6, s - ps));
+        const e = { m: deg(cur), l: 3 };
+        lead[b * 16 + s] = e; prev = e; ps = s;
+      }
+    }
+  }
+  return planCache[t.id] = { kit, chords, bassNote, lead, drumFrom: 2, bassFrom: 1, outro: bars - 2 };
+}
+const midi = m => 440 * Math.pow(2, (m - 69) / 12);
+
+const Synth = {
+  ctx: null, master: null, noise: null, bus: null, send: null, timer: null, tr: null, plan: null,
+  step: 0, startStep: 0, total: 0, stepDur: 0, t0: 0, base: 0, volume: .8,
+  init() {
+    if (this.ctx) return;
+    const C = window.AudioContext || window.webkitAudioContext;
+    this.ctx = new C();
+    const comp = this.ctx.createDynamicsCompressor();
+    this.master = this.ctx.createGain(); this.master.gain.value = this.volume;
+    this.master.connect(comp); comp.connect(this.ctx.destination);
+    const len = this.ctx.sampleRate, buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.noise = buf;
+  },
+  makeBus() {
+    const c = this.ctx;
+    this.bus = c.createGain(); this.bus.connect(this.master);
+    this.send = c.createGain(); this.send.gain.value = .32;
+    const dl = c.createDelay(1); dl.delayTime.value = .34;
+    const fb = c.createGain(); fb.gain.value = .32;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2000;
+    this.send.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(this.bus);
+  },
+  start(t, pos) {
+    this.init(); this.ctx.resume();
+    this.stopNow();
+    this.tr = t; this.plan = makePlan(t);
+    this.stepDur = 60 / t.bpm / 4; this.total = t.bars * 16;
+    this.startStep = this.step = Math.max(0, Math.min(this.total - 1, Math.floor(pos / this.stepDur)));
+    this.base = this.startStep * this.stepDur;
+    this.makeBus();
+    this.t0 = this.ctx.currentTime + .06;
+    this.timer = setInterval(() => this.sched(), 25);
+    this.sched();
+  },
+  time(s) { return this.t0 + (s - this.startStep) * this.stepDur + (s % 2 ? this.tr.swing * this.stepDur : 0); },
+  sched() {
+    while (this.step < this.total && this.time(this.step) < this.ctx.currentTime + .18) { this.play(this.step, this.time(this.step)); this.step++; }
+  },
+  pos() {
+    if (!this.timer) return this.base;
+    return Math.min(this.total * this.stepDur, this.base + Math.max(0, this.ctx.currentTime - this.t0));
+  },
+  pause() { if (this.timer) this.base = this.pos(); this.stopNow(); },
+  stopNow() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    if (this.bus) {
+      const b = this.bus, s = this.send; this.bus = null;
+      b.gain.setTargetAtTime(0, this.ctx.currentTime, .02);
+      setTimeout(() => { try { b.disconnect(); s.disconnect(); } catch (e) {} }, 500);
+    }
+  },
+  setVolume(v) { this.volume = v; if (this.master) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, .02); },
+  play(s, t) {
+    const p = this.plan, bar = s >> 4, st = s & 15, sd = this.stepDur, kit = p.kit, live = bar < p.outro;
+    if (live && bar >= p.drumFrom) {
+      if (kit.k.indexOf(st) >= 0) this.kick(t, bar >= 4 ? 1 : .65);
+      if (bar >= 4 && kit.s.indexOf(st) >= 0) this.snare(t);
+      if (kit.h.indexOf(st) >= 0) this.hat(t, kit.hv * (st % 4 === 2 ? 1 : .65));
+    }
+    if (st === 0) this.pad(t, p.chords[bar], sd * 16);
+    if (live && bar >= p.bassFrom && kit.bass.indexOf(st) >= 0) this.bass(t, p.bassNote[bar], sd * 2.4);
+    const n = p.lead[s]; if (n) this.lead(t, n.m, n.l * sd);
+  },
+  osc(type, f, t, dur, peak, dest, att) {
+    const c = this.ctx, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + (att || .01));
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g); g.connect(dest || this.bus); o.start(t); o.stop(t + dur + .05);
+    return { o: o, g: g };
+  },
+  lead(t, m, len) {
+    const c = this.ctx, f = c.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.setValueAtTime(this.tr.bright, t); f.frequency.exponentialRampToValueAtTime(700, t + len + .1);
+    f.connect(this.bus); f.connect(this.send);
+    this.osc(this.tr.wave, midi(m), t, len + .18, .15, f, .012);
+  },
+  pad(t, chord, len) {
+    const c = this.ctx, f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400; f.connect(this.bus);
+    chord.forEach((m, i) => {
+      const v = this.osc(this.tr.wave === 'sine' ? 'sine' : 'triangle', midi(m), t, len + .3, .045, f, .5);
+      v.o.detune.value = (i - 1) * 7;
+    });
+  },
+  bass(t, m, len) {
+    const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 520; f.connect(this.bus);
+    this.osc('triangle', midi(m), t, len, .34, f, .008);
+  },
+  kick(t, v) {
+    const v1 = this.osc('sine', 150, t, .32, .95 * v, this.bus, .003);
+    v1.o.frequency.setValueAtTime(150, t); v1.o.frequency.exponentialRampToValueAtTime(42, t + .12);
+  },
+  noiseHit(t, dur, type, freq, peak) {
+    const c = this.ctx, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = this.noise; f.type = type; f.frequency.value = freq;
+    g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(this.bus); s.start(t, Math.random() * .5); s.stop(t + dur + .02);
+  },
+  snare(t) { this.noiseHit(t, .16, 'bandpass', 1900, .3); this.osc('triangle', 190, t, .09, .18, this.bus, .002); },
+  hat(t, v) { this.noiseHit(t, .045, 'highpass', 7500, v); }
+};
+
+/* ---------- state ---------- */
+const audio = new Audio(); audio.preload = 'auto';
+const S = { view: 'home', q: '', uploads: [], liked: new Set(), cur: null, queue: [], playing: false, shuffle: false, repeat: 0, vol: .8, muted: false, dragging: false, resumePos: 0, ending: false, found: [], foundQ: '', loading: false, req: 0 };
+let uid = 0;
+try { const raw = localStorage.getItem('soundroom.liked'); if (raw) S.liked = new Set(JSON.parse(raw)); } catch (e) {}
+const saveLiked = () => { try { localStorage.setItem('soundroom.liked', JSON.stringify([...S.liked])); } catch (e) {} };
+
+const LM_KEY = 'soundroom.likedmeta';
+function lmLoad() { try { return JSON.parse(localStorage.getItem(LM_KEY) || '{}'); } catch (e) { return {}; } }
+function lmSync(id) {
+  const m = lmLoad(), t = byId(id);
+  if (S.liked.has(id) && t && t.remote && id.charAt(0) !== 'h') m[id] = { title: t.title, artist: t.artist, tag: t.tag, art: t.art || '', file: t.file || '', yt: t.yt || '' };
+  else delete m[id];
+  try { localStorage.setItem(LM_KEY, JSON.stringify(m)); } catch (e) {}
+}
+const allTracks = () => TRACKS.concat(S.uploads);
+const byId = id => allTracks().find(t => t.id === id) || HITS.find(t => t.id === id) || REG[id];
+const plTracks = p => p.ids.map(byId);
+const durOf = t => t.remote ? (t.dur || 30) : t.file ? (t.dur || 0) : t.bars * 16 * 60 / t.bpm / 4;
+function fmt(s) { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+let toastT;
+function toast(msg) { const el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2400); }
+
+function searchResults() {
+  const q = S.q.trim().toLowerCase(); if (!q) return [];
+  return allTracks().filter(t => (t.title + ' ' + t.artist + ' ' + t.tag).toLowerCase().indexOf(q) >= 0);
+}
+function listFor(ctx) {
+  if (ctx === 'all') return allTracks();
+  if (ctx === 'liked') return Array.from(S.liked).map(byId).filter(Boolean);
+  if (ctx === 'mine') return S.uploads;
+  if (ctx === 'search') return searchResults();
+  if (ctx === 'hits-th') return thHits();
+  if (ctx === 'hits-intl') return intlHits();
+  if (ctx === 'hits-search') return hitsFor(S.q);
+  if (ctx === 'itunes') return S.found;
+  if (ctx.indexOf('artist:') === 0) { const st = ARTL[ctx.slice(7)]; return st ? st.list : []; }
+  if (ctx.indexOf('pl:') === 0) { const p = PLAYLISTS.find(x => x.id === ctx.slice(3)); return p ? plTracks(p) : []; }
+  return [];
+}
+
+/* ---------- playback ---------- */
+function getPos() { const t = S.cur; if (!t) return 0; if (t.yt) return (ytP && ytP.getCurrentTime && ytP.getCurrentTime()) || 0; return t.file ? audio.currentTime : t.remote ? 0 : Synth.pos(); }
+function getDur() { const t = S.cur; if (!t) return 0; if (t.yt) return (ytP && ytP.getDuration && ytP.getDuration()) || t.dur || 0; return t.file ? (audio.duration && isFinite(audio.duration) ? audio.duration : t.dur || 0) : durOf(t); }
+function engineStart(t, pos) {
+  S.ending = false;
+  if (t.yt) {
+    Synth.pause(); audio.pause();
+    ytInit().then(p => {
+      if (S.cur !== t || !S.playing) return;
+      if (ytCur !== t.yt) { ytCur = t.yt; p.loadVideoById({ videoId: t.yt, startSeconds: pos || 0 }); }
+      else { p.seekTo(pos || 0, true); p.playVideo(); }
+    }).catch(() => { S.playing = false; syncAll(); toast('โหลดตัวเล่น YouTube ไม่ได้ เช็กอินเทอร์เน็ต'); });
+    return;
+  }
+  if (t.file) {
+    ytStop(); Synth.pause();
+    if (audio.getAttribute('data-id') !== t.id) { audio.src = t.file; audio.setAttribute('data-id', t.id); }
+    try { audio.currentTime = pos || 0; } catch (e) {}
+    audio.play().catch(() => { S.playing = false; syncAll(); toast('เล่นไฟล์นี้ไม่ได้ ลองไฟล์รูปแบบอื่น'); });
+  } else {
+    audio.pause(); ytStop();
+    Synth.start(t, pos || 0);
+  }
+}
+function enginePause() { S.resumePos = getPos(); if (S.cur && S.cur.yt) ytStop(); else if (S.cur && S.cur.file) audio.pause(); else Synth.pause(); }
+/* ---------- artists (full catalogue pulled live from iTunes) ---------- */
+const ARTISTS = [
+  { id: 'youngohm', name: 'YOUNGOHM', terms: ['YOUNGOHM', 'ยังโอม'], match: ['youngohm', 'ยังโอม'], seeds: ['เฉยเมย', 'ธารารัตน์', 'ธาตุทองซาวด์', 'Doo White', 'ไฟเย็น', 'อยู่ดีๆ ก็...'] },
+  { id: 'porzax', name: 'PORZAX', terms: ['PORZAX', 'PROZAX'], match: ['porzax', 'prozax'], seeds: ['ไม่ได้เลวขนาดนั้น'] }
+];
+const ARTL = {};
+const artistCard = a => '<button type="button" class="card" data-go="artist:' + a.id + '"><i class="cv" style="background-image:' + cover('ar' + a.id) + '"></i><strong>' + esc(a.name) + '</strong><small>ศิลปิน</small></button>';
+const artistTile = a => '<button type="button" class="tile" data-go="artist:' + a.id + '"><i class="cv" style="background-image:' + cover('ar' + a.id) + '"></i><strong>' + esc(a.name) + '</strong></button>';
+async function loadArtist(a) {
+  const st = ARTL[a.id] || (ARTL[a.id] = { list: [], loading: false, done: false });
+  if (st.loading || st.done) return;
+  st.loading = true;
+  const seeds = a.seeds.map((title, i) => { const id = 'a' + a.id + i; return REG[id] || (REG[id] = { id, title, artist: a.name, tag: 'ศิลปิน', remote: true, file: null, dur: 30 }); });
+  st.list = seeds.slice();
+  const seen = {}; seeds.forEach(t => { seen[norm(t.title)] = 1; });
+  try {
+    for (const term of a.terms) {
+      const res = await itunes(term, 200, 'TH', true, '&attribute=artistTerm');
+      res.filter(r => a.match.some(m => norm(r.artistName).indexOf(m) >= 0)).forEach(r => {
+        const n = norm(r.trackName); if (seen[n]) return; seen[n] = 1; st.list.push(toTrack(r));
+      });
+      if (S.view === 'artist:' + a.id) renderMain();
+    }
+  } catch (e) { st.err = true; }
+  st.loading = false; st.done = true;
+  if (S.view === 'artist:' + a.id) renderMain();
+}
+
+/* ---------- cover art for list rows ---------- */
+const artCache = (() => { try { return JSON.parse(localStorage.getItem('soundroom.art') || '{}'); } catch (e) { return {}; } })();
+const artQ = []; let artBusy = 0;
+function setArt(h) {
+  document.querySelectorAll('.row[data-id="' + h.id + '"] .cv').forEach(el => { el.style.backgroundImage = "url('" + h.art + "')"; });
+  if (S.cur && S.cur.id === h.id) renderPlayer();
+}
+async function fetchArt(h) {
+  const k = norm(h.title + h.artist);
+  const core = h.title.replace(/\s*\(.*?\)\s*/g, ' ').trim(), inner = (h.title.match(/\((.*?)\)/) || [])[1] || '';
+  const a1 = h.artist.split(/\s*(?:&|,)\s*/)[0];
+  const keys = [norm(core), inner && norm(inner)].filter(x => x && x.length >= 2);
+  for (const c of ['TH', 'US']) {
+    const res = await itunes(core + ' ' + a1, 8, c);
+    const byT = res.filter(x => keys.some(q => norm(x.trackName).indexOf(q) >= 0));
+    const m = byT.find(x => norm(x.artistName).indexOf(norm(a1)) >= 0) || byT[0];
+    if (m) { h.art = artOf(m); h.pv = m.previewUrl; artCache[k] = h.art; try { localStorage.setItem('soundroom.art', JSON.stringify(artCache)); } catch (e) {} return; }
+  }
+}
+function artPump() {
+  if (S.loading) { setTimeout(artPump, 2000); return; }
+  while (artBusy < 3 && artQ.length) {
+    const h = artQ.shift(); artBusy++;
+    fetchArt(h).then(() => { if (h.art) setArt(h); }).catch(() => {}).then(() => { artBusy--; artPump(); });
+  }
+}
+function scanArt() {
+  document.querySelectorAll('.row.hit[data-id]').forEach(r => {
+    const h = byId(r.getAttribute('data-id')); if (!h || h.art || h.artTried) return;
+    h.artTried = true; const k = norm(h.title + h.artist);
+    if (artCache[k]) { h.art = artCache[k]; setArt(h); } else artQ.push(h);
+  });
+  artPump();
+}
+
+/* ---------- YouTube full-song playback (IFrame player + your own Data API key) ---------- */
+let ytP = null, ytWait = null, ytCur = '';
+const ytStop = () => { try { ytP && ytP.pauseVideo && ytP.pauseVideo(); } catch (e) {} };
+function ytInit() {
+  if (ytWait) return ytWait;
+  ytWait = new Promise((res, rej) => {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:-9999px;top:0;width:220px;height:220px;overflow:hidden';
+    d.innerHTML = '<div id="ytp"></div>'; document.body.appendChild(d);
+    window.onYouTubeIframeAPIReady = () => {
+      ytP = new YT.Player('ytp', { width: '220', height: '220', playerVars: { playsinline: 1, controls: 0, rel: 0 },
+        events: { onReady: () => { try { ytP.setVolume(Math.round((S.muted ? 0 : S.vol) * 100)); } catch (e) {} res(ytP); }, onStateChange: ytState, onError: ytErr, onAutoplayBlocked: () => toast('เบราว์เซอร์บล็อกการเล่นอัตโนมัติ กดปุ่มเล่นอีกครั้ง') } });
+    };
+    const sc = document.createElement('script'); sc.src = 'https://www.youtube.com/iframe_api';
+    sc.onerror = () => { ytWait = null; rej(new Error('yt')); };
+    document.head.appendChild(sc);
+    setTimeout(() => { if (!ytP) { ytWait = null; rej(new Error('timeout')); } }, 12000);
+  });
+  return ytWait;
+}
+function ytState(e) {
+  const t = S.cur; if (!t || !t.yt) return;
+  if (e.data === 0 && !S.ending) { S.ending = true; step(1, true); }
+  if (e.data === 1) { try { t.dur = ytP.getDuration(); } catch (x) {} if (!S.playing) { S.playing = true; syncAll(); } }
+}
+function ytErr() {
+  const t = S.cur; if (!t || !t.yt) return;
+  const c = ytCacheGet(); delete c[norm(t.title + t.artist)]; ytCacheSave(c);
+  ytCur = '';
+  if (t.ytAlt && t.ytAlt.length && location.protocol !== 'file:') { t.yt = t.ytAlt.shift(); engineStart(t, 0); return; }
+  t.yt = null;
+  toast(location.protocol === 'file:' ? 'YouTube ไม่ยอมเล่นจากไฟล์ที่เปิดตรง ๆ ให้รันผ่าน localhost จึงจะฟังเต็มเพลงได้' : 'วิดีโอนี้ฝังเล่นไม่ได้ ใช้ตัวอย่าง 30 วิแทน');
+  playTrack(t.id);
+}
+/* แหล่งเสียง: 'yt' = เต็มเพลงจาก YouTube (อาจมีโฆษณา) | 'it' = ตัวอย่าง 30 วิจาก iTunes (ไม่มีโฆษณา เล่นบนมือถือได้ดีกว่า) */
+const srcGet = () => { let v = ''; try { v = localStorage.getItem('soundroom.src') || ''; } catch (e) {} if (v === 'yt' || v === 'it') return v; try { return matchMedia('(pointer:coarse)').matches ? 'it' : 'yt'; } catch (e) { return 'yt'; } };
+const srcSet = v => { try { localStorage.setItem('soundroom.src', v); } catch (e) {} };
+const YT_DEFAULT_KEY ='AIzaSyAjX2Zsy2B9iEScBqwP3Hlk4gFycwxjSD0'; // คีย์เริ่มต้น (ผู้ใช้เปลี่ยนเองได้ที่ปุ่ม "ตั้งค่า YouTube")
+const ytKeyGet = () => { let k = ''; try { k = localStorage.getItem('soundroom.ytkey') || ''; } catch (e) {} return k || YT_DEFAULT_KEY; };
+function ytCacheGet() { try { return JSON.parse(localStorage.getItem('soundroom.yt') || '{}'); } catch (e) { return {}; } }
+function ytCacheSave(c) { try { localStorage.setItem('soundroom.yt', JSON.stringify(c)); } catch (e) {} }
+function ytKeyAsk() {
+  let d = $('#keyDlg');
+  if (!d) {
+    d = document.createElement('div'); d.id = 'keyDlg';
+    d.style.cssText = 'position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:rgba(0,0,0,.6);padding:16px';
+    d.innerHTML = '<div style="background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:460px;width:100%"><h2 style="font-size:20px;margin-bottom:8px">เล่นเต็มเพลงผ่าน YouTube</h2><p style="color:var(--mute);font-size:13px;margin-bottom:12px">ใส่ YouTube Data API key ของคุณ (ฟรี: console.cloud.google.com → เปิด YouTube Data API v3 → Credentials → Create API key) ถ้าไม่ใส่จะได้แค่ตัวอย่าง 30 วินาที</p><input id="keyIn" type="text" autocomplete="off" placeholder="AIza..." style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit;margin-bottom:12px"><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="ghost" id="keyNo">ยกเลิก</button><button type="button" class="ghost" id="keyOk" style="border-color:var(--accent);color:var(--accent)">บันทึก</button></div></div>';
+    document.body.appendChild(d);
+    $('#keyNo').addEventListener('click', () => { d.hidden = true; });
+    $('#keyOk').addEventListener('click', () => {
+      const v = $('#keyIn').value.trim();
+      try { localStorage.setItem('soundroom.ytkey', v); } catch (e) {}
+      HITS.concat(Object.keys(REG).map(k => REG[k])).forEach(x => { x.tried = false; });
+      d.hidden = true; toast(v ? 'บันทึกคีย์แล้ว กดเล่นเพลงอีกครั้งเพื่อฟังเต็มเพลง' : 'ล้างคีย์แล้ว จะเล่นแค่ตัวอย่าง 30 วิ');
+    });
+    $('#keyIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('#keyOk').click(); });
+  }
+  $('#keyIn').value = ytKeyGet(); d.hidden = false; $('#keyIn').focus();
+}
+async function resolveYT(t) {
+  const k0 = norm(t.title + t.artist), ck = ytCacheGet();
+  if (ck[k0]) { t.yt = ck[k0].id; if (!t.art && ck[k0].art) t.art = ck[k0].art; return true; }
+  let key = ytKeyGet();
+  if (!key) { if (!S.askedKey) { S.askedKey = true; ytKeyAsk(); } return false; }
+  try {
+    const q = t.title.replace(/\s*\(.*?\)\s*/g, ' ') + ' ' + t.artist + ' official';
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 7000);
+    let r; try { r = await fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoCategoryId=10&maxResults=3&videoSyndicated=true&q=' + encodeURIComponent(q) + '&key=' + encodeURIComponent(key), { signal: ac.signal }); } finally { clearTimeout(to); }
+    if (!r.ok) { t.failed = 'yt'; t.ytStatus = r.status; return false; }
+    const j = await r.json(), it = (j.items || [])[0]; if (!it) return false;
+    t.yt = it.id.videoId; t.ytAlt = (j.items || []).slice(1).map(x => x.id.videoId);
+    const th = it.snippet.thumbnails && (it.snippet.thumbnails.medium || it.snippet.thumbnails.default);
+    if (!t.art && th) t.art = th.url;
+    ck[k0] = { id: t.yt, art: t.art }; ytCacheSave(ck);
+    return true;
+  } catch (e) { t.failed = 'net'; return false; }
+}
+
+/* ---------- iTunes 30s previews (lets chart songs play in-app) ---------- */
+function itunesJsonp(url) {
+  return new Promise((res, rej) => {
+    const cb = '__it' + Math.random().toString(36).slice(2), sc = document.createElement('script');
+    const done = () => { clearTimeout(to); delete window[cb]; sc.remove(); };
+    const to = setTimeout(() => { done(); rej(new Error('jsonp timeout')); }, 8000);
+    window[cb] = j => { done(); res(j); };
+    sc.onerror = () => { done(); rej(new Error('jsonp blocked')); };
+    sc.src = url + '&callback=' + cb; document.head.appendChild(sc);
+  });
+}
+async function itunesRaw(url) {
+  try { return await itunesJsonp(url); }
+  catch (e) { const r = await fetch(url); if (!r.ok) throw new Error('http ' + r.status); return await r.json(); }
+}
+const itQ = []; let itBusy = false, itLast = 0;
+async function itRun() {
+  if (itBusy) return; itBusy = true;
+  while (itQ.length) {
+    const job = itQ.shift(), wait = Math.max(0, itLast + 3000 - Date.now());
+    if (wait) await new Promise(r => setTimeout(r, wait));
+    itLast = Date.now();
+    try { job.res(await itunesRaw(job.url)); } catch (e) { job.rej(e); }
+  }
+  itBusy = false;
+}
+function itunes(term, limit, country, hi, extra) {
+  const url = 'https://itunes.apple.com/search?media=music&entity=song&limit=' + limit + '&country=' + country + (extra || '') + '&term=' + encodeURIComponent(term);
+  return new Promise((res, rej) => { const job = { url, res, rej }; if (hi) itQ.unshift(job); else itQ.push(job); itRun(); })
+    .then(j => (j.results || []).filter(x => x.previewUrl));
+}
+const norm = x => String(x).toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, '');
+const artOf = r => (r.artworkUrl100 || '').replace('100x100', '300x300');
+function toTrack(r) {
+  const id = 'i' + r.trackId;
+  return REG[id] || (REG[id] = { id, title: r.trackName, artist: r.artistName, tag: r.collectionName || 'iTunes', remote: true, file: r.previewUrl, dur: 30, art: artOf(r) });
+}
+async function resolvePreview(t) {
+  const useYT = srcGet() === 'yt';
+  if (t.yt && useYT) return true;
+  if (useYT && !t.tried) { t.tried = true; if (await resolveYT(t)) return true; }
+  if (t.file) return true;
+  if (t.pv) { t.file = t.pv; t.dur = 30; return true; }
+  S.status = 'กำลังหาตัวอย่างเสียงจาก iTunes…'; renderPlayer();
+  const core = t.title.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+  const inner = (t.title.match(/\((.*?)\)/) || [])[1] || '';
+  const a1 = t.artist.split(/\s*(?:&|,)\s*/)[0];
+  const keys = [norm(core), inner && norm(inner)].filter(k => k && k.length >= 2);
+  let netErr = false;
+  const terms = [core + ' ' + a1, t.title + ' ' + t.artist];
+  for (const term of terms) {
+    for (const c of ['TH', 'US']) {
+      try {
+        const res = await itunes(term, 8, c, true);
+        const hits = res.filter(x => { const n = norm(x.trackName); return keys.some(k => n.indexOf(k) >= 0); });
+        const m = hits.find(x => norm(x.artistName).indexOf(norm(a1)) >= 0) || hits[0];
+        if (m) { t.file = m.previewUrl; t.dur = 30; t.art = artOf(m); t.matched = m.trackName + ' · ' + m.artistName; return true; }
+      } catch (e) { netErr = true; }
+    }
+  }
+  t.failed = netErr ? 'net' : 'none';
+  return false;
+}
+function playTrack(id, ctx) {
+  const t = byId(id); if (!t) return;
+  if (ctx) S.queue = listFor(ctx).map(x => x.id);
+  if (S.queue.indexOf(id) < 0) S.queue = [id];
+  S.cur = t; S.playing = true; S.resumePos = 0; S.loading = false;
+  const rq = ++S.req;
+  if (t.remote && !t.yt && (!t.tried || !t.file)) {
+    S.loading = true; S.status = 'กำลังหาเพลงจาก YouTube…'; audio.pause(); Synth.pause(); ytStop(); syncAll(); mediaMeta();
+    Promise.race([resolvePreview(t), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 25000))]).then(ok => {
+      if (rq !== S.req) return;
+      S.loading = false;
+      if (ok) { if (!t.yt && t.failed === 'yt') toast('YouTube ตอบรหัส ' + (t.ytStatus || '?') + ' (เช็กคีย์/โควตา/การจำกัดโดเมน) เล่นตัวอย่าง 30 วิแทน'); if (S.playing) engineStart(t, 0); }
+      else { S.playing = false; toast(t.failed === 'net' ? (location.protocol === 'file:' ? 'เรียกเน็ตไม่ได้ ลองรันผ่าน localhost (ดูวิธีในแชท) แทนการดับเบิลคลิกไฟล์' : 'เรียกเน็ตไม่ได้ อาจถูกบล็อกหรือไม่มีอินเทอร์เน็ต') : 'ไม่พบตัวอย่างเสียงของเพลงนี้'); }
+      syncAll();
+    }).catch(() => {
+      if (rq !== S.req) return;
+      S.loading = false; S.playing = false; syncAll();
+      toast('เล่นเพลงนี้ไม่ได้ ลองเพลงอื่นหรือเช็กอินเทอร์เน็ต');
+    });
+    return;
+  }
+  engineStart(t, 0); syncAll(); mediaMeta();
+}
+function togglePlay() {
+  if (!S.cur) { const first = allTracks()[0]; playTrack(first.id, 'all'); return; }
+  if (S.playing) { enginePause(); S.playing = false; }
+  else { if (S.cur.remote && !S.cur.file && !S.cur.yt) { playTrack(S.cur.id); return; } S.playing = true; engineStart(S.cur, S.resumePos); }
+  syncAll();
+}
+function step(dir, auto) {
+  if (!S.cur || !S.queue.length) return;
+  const q = S.queue, i = q.indexOf(S.cur.id);
+  if (auto && S.repeat === 2) { S.resumePos = 0; engineStart(S.cur, 0); return; }
+  let n;
+  if (S.shuffle && q.length > 1) { do { n = Math.floor(Math.random() * q.length); } while (n === i); }
+  else {
+    n = i + dir;
+    if (n >= q.length) { if (S.repeat === 1 || !auto) n = 0; else { enginePause(); S.playing = false; S.resumePos = 0; engineSeekReset(); syncAll(); return; } }
+    if (n < 0) n = q.length - 1;
+  }
+  playTrack(q[n]);
+}
+function engineSeekReset() { if (S.cur && S.cur.yt) { try { ytP && ytP.seekTo(0, true); ytStop(); } catch (e) {} } else if (S.cur && S.cur.file) { try { audio.currentTime = 0; } catch (e) {} } else Synth.base = 0; }
+function prevTrack() { if (getPos() > 3) { seekTo(0); } else step(-1, false); }
+function seekTo(sec) {
+  if (!S.cur) return;
+  S.resumePos = sec;
+  if (S.cur.yt) { try { ytP && ytP.seekTo(sec, true); } catch (e) {} }
+  else if (S.cur.file) { try { audio.currentTime = sec; } catch (e) {} }
+  else if (S.playing) Synth.start(S.cur, sec);
+  else Synth.base = sec;
+}
+function setVolume() {
+  const v = S.muted ? 0 : S.vol;
+  Synth.setVolume(v); audio.volume = v; try { ytP && ytP.setVolume && ytP.setVolume(Math.round(v * 100)); } catch (e) {}
+  const r = $('#vol'); r.value = Math.round(S.vol * 100); r.style.setProperty('--p', (S.muted ? 0 : S.vol * 100) + '%');
+  $('#bMute').innerHTML = ic(S.muted || S.vol === 0 ? 'mute' : 'vol');
+  $('#bMute').setAttribute('aria-label', S.muted ? 'เปิดเสียง' : 'ปิดเสียง');
+}
+audio.addEventListener('ended', () => { if (S.cur && S.cur.file && audio.getAttribute('data-id') === S.cur.id && !S.ending) { S.ending = true; step(1, true); } });
+audio.addEventListener('loadedmetadata', () => { if (S.cur && S.cur.file && isFinite(audio.duration)) { S.cur.dur = audio.duration; } });
+
+function mediaMeta() {
+  try {
+    if (!('mediaSession' in navigator) || !S.cur) return;
+    navigator.mediaSession.metadata = new MediaMetadata({ title: S.cur.title, artist: S.cur.artist });
+    navigator.mediaSession.setActionHandler('play', togglePlay);
+    navigator.mediaSession.setActionHandler('pause', togglePlay);
+    navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
+    navigator.mediaSession.setActionHandler('nexttrack', () => step(1, false));
+  } catch (e) {}
+}
+
+/* ---------- rendering ---------- */
+const fav = id => S.liked.has(id);
+const likeBtn = (id, cls) => '<button type="button" class="like' + (cls ? ' ' + cls : '') + '" data-like="' + id + '" aria-pressed="' + fav(id) + '" aria-label="' + (fav(id) ? 'เลิกถูกใจ' : 'ถูกใจ') + '">' + ic(fav(id) ? 'heartfill' : 'heart', 18) + '</button>';
+const coverOf = t => t.art ? "url('" + t.art + "')" : cover(t.id.charAt(0) === 'h' && t.remote ? 'hit' + t.title : t.id);
+function row(t, i, ctx) {
+  return '<div class="row" role="button" tabindex="0" data-id="' + t.id + '" data-ctx="' + ctx + '"><span class="idx"><b>' + (i + 1) + '</b><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></span>' +
+    '<span class="who"><i class="cv" style="background-image:' + coverOf(t) + '"></i><span class="tt"><strong>' + esc(t.title) + '</strong><small>' + esc(t.artist) + '</small></span></span>' +
+    '<span class="alb">' + esc(t.tag) + '</span>' + likeBtn(t.id) + '<time data-dur="' + t.id + '">' + fmt(durOf(t)) + '</time></div>';
+}
+function hitRow(h, i, rank, ctx) {
+  const qs = encodeURIComponent(h.title + ' ' + h.artist);
+  return '<div class="row hit" role="button" tabindex="0" data-id="' + h.id + '" data-ctx="' + ctx + '"><span class="idx"><b>' + (rank ? (i + 1) : ic('note', 16)) + '</b><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></span>' +
+    '<span class="who"><i class="cv" style="background-image:' + coverOf(h) + '"></i><span class="tt"><strong>' + esc(h.title) + '</strong><small>' + esc(h.artist) + '</small></span></span>' +
+    '<span class="alb">' + esc(h.src) + '</span>' + likeBtn(h.id) + '</div>';
+}
+function hitsSection(title, sub, list, rank, ctx) {
+  return '<section class="hits"><div class="sec-h"><h2>' + title + '</h2><span>' + sub + '</span></div><div class="list">' + list.map((h, i) => hitRow(h, i, rank, ctx)).join('') + '</div></section>';
+}
+const thHits = () => HITS.filter(h => h.th), intlHits = () => HITS.filter(h => !h.th);
+function hitsFor(q) { q = q.trim().toLowerCase(); return HITS.filter(h => (h.title + ' ' + h.artist + ' ' + h.src).toLowerCase().indexOf(q) >= 0); }
+const hitNote = '<p class="hint">กดเล่นเพื่อฟังในแอพ ถ้าใส่ YouTube API key จะเล่นเต็มเพลง ถ้าไม่ใส่จะได้ตัวอย่าง 30 วินาทีจาก iTunes <button type="button" class="ghost" data-srcsw>สลับ: YouTube เต็มเพลง ⇄ iTunes ไม่มีโฆษณา</button> <button type="button" class="ghost" data-ytkey>ตั้งค่า YouTube</button></p>';
+const rows = (list, ctx) => '<div class="list" role="list">' + list.map((t, i) => row(t, i, ctx)).join('') + '</div>';
+const navItems = [['home', 'home', 'หน้าแรก'], ['search', 'search', 'ค้นหา'], ['lib', 'lib', 'ไลบรารี']];
+
+function renderSide() {
+  $('#nav').innerHTML = navItems.slice(0, 2).map(n => '<button type="button" class="nl' + (S.view === n[0] ? ' on' : '') + '" data-go="' + n[0] + '">' + ic(n[1], 22) + n[2] + '</button>').join('');
+  const li = (go, cv, name, sub) => '<button type="button" class="li' + (S.view === go ? ' on' : '') + '" data-go="' + go + '">' + cv + '<span><strong>' + esc(name) + '</strong><small>' + sub + '</small></span></button>';
+  $('#lib').innerHTML =
+    li('liked', '<i class="cv heart">' + ic('heartfill', 20) + '</i>', 'เพลงที่ถูกใจ', 'เพลย์ลิสต์ · ' + listFor('liked').length + ' เพลง') +
+    li('mine', '<i class="cv files">' + ic('upload', 20) + '</i>', 'ไฟล์ของฉัน', 'อัปโหลด · ' + S.uploads.length + ' ไฟล์') +
+    PLAYLISTS.map(p => li('pl:' + p.id, '<i class="cv" style="background-image:' + cover(p.id) + '"></i>', p.name, 'เพลย์ลิสต์ · ' + p.ids.length + ' เพลง')).join('') +
+    ARTISTS.map(a => li('artist:' + a.id, '<i class="cv" style="background-image:' + cover('ar' + a.id) + '"></i>', a.name, 'ศิลปิน')).join('');
+  $('#navm').innerHTML = navItems.map(n => '<button type="button" class="' + (S.view === n[0] || (n[0] === 'lib' && /^(pl:|artist:|liked|mine)/.test(S.view)) ? 'on' : '') + '" data-go="' + n[0] + '">' + ic(n[1], 22) + n[2] + '</button>').join('');
+}
+function greet() {
+  const h = new Date().getHours();
+  return h >= 5 && h < 12 ? 'อรุณสวัสดิ์' : h < 17 ? 'สวัสดีตอนบ่าย' : h < 21 ? 'สวัสดีตอนเย็น' : 'ราตรีสวัสดิ์';
+}
+const plCard = p => '<button type="button" class="card" data-go="pl:' + p.id + '"><i class="cv" style="background-image:' + cover(p.id) + '"></i><strong>' + esc(p.name) + '</strong><small>' + p.ids.length + ' เพลง</small></button>';
+function head(kicker, title, desc, meta, cvHtml) {
+  return '<header class="phead">' + cvHtml + '<div class="txt"><p class="kicker">' + kicker + '</p><h1>' + esc(title) + '</h1>' + (desc ? '<p class="desc">' + esc(desc) + '</p>' : '') + '<p class="meta">' + meta + '</p></div></header>';
+}
+function actions(ctx, count) {
+  return count ? '<div class="acts"><button type="button" class="big" data-playctx="' + ctx + '" aria-label="เล่นทั้งหมด">' + ic('play', 26) + '</button><button type="button" class="ghost" data-shuffle-ctx="' + ctx + '">' + ic('shuffle', 18) + 'สุ่มเล่น</button></div>' : '';
+}
+function totalMeta(list) { const m = Math.round(list.reduce((a, t) => a + durOf(t), 0) / 60); return list.length + ' เพลง' + (m ? ' · ประมาณ ' + m + ' นาที' : ''); }
+const dropZone = '<div class="drop" id="drop"><strong>ลากไฟล์เพลงมาวางที่นี่</strong>รองรับ mp3, m4a, wav, ogg ไฟล์จะอยู่ในหน้านี้จนกว่าจะปิดแท็บ<div style="margin-top:14px"><button type="button" class="ghost" data-pick>' + ic('plus', 18) + 'เลือกไฟล์</button> <button type="button" class="ghost" data-addurl>' + ic('plus', 18) + 'เพิ่มด้วยลิงก์</button> <button type="button" class="ghost" data-clearurls>ล้างลิงก์ที่เพิ่ม</button></div></div>';
+
+function renderMain() {
+  const m = $('#main'), v = S.view;
+  if (v === 'home') {
+    const date = new Date().toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' });
+    m.innerHTML = '<header class="hello"><p class="kicker">' + date + '</p><h1>' + greet() + '</h1></header>' +
+      '<div class="tiles">' + PLAYLISTS.map(p => '<button type="button" class="tile" data-go="pl:' + p.id + '"><i class="cv" style="background-image:' + cover(p.id) + '"></i><strong>' + esc(p.name) + '</strong></button>').join('') +
+      '<button type="button" class="tile" data-go="liked"><i class="cv heart">' + ic('heartfill', 22) + '</i><strong>เพลงที่ถูกใจ</strong></button>' + ARTISTS.map(artistTile).join('') + '</div>' +
+      hitsSection('ชาร์ตเพลงไทย', 'Spotify · iTunes · วิทยุ', thHits().slice(0, 16), true, 'hits-th') + hitNote +
+      hitsSection('เพลงสากล · K-pop', 'Billboard · ชาร์ตไทย · ฮิตตลอดกาล', intlHits().slice(0, 16), true, 'hits-intl') +
+      '<div class="sec-h"><h2>เพลงในแอพ</h2><span>' + allTracks().length + ' เพลง</span></div>' + rows(allTracks(), 'all') +
+      '<p class="note"><b>เพลงตัวอย่างสร้างเสียงสดในเบราว์เซอร์</b> ด้วย Web Audio ทุกครั้งที่กดเล่น จึงไม่มีไฟล์เสียงให้ดาวน์โหลด อยากฟังเพลงของคุณเองในแอพ กดปุ่ม + ที่ไลบรารีหรือลากไฟล์มาวางได้เลย ส่วนเพลงดังข้างบนอ้างอิงจากชาร์ตและกดเล่นฟังได้ในแอพ</p>';
+  } else if (v === 'search') {
+    m.innerHTML = '<header class="hello"><h1>ค้นหา</h1></header><label class="search">' + ic('search', 20) + '<span class="visually-hidden">ค้นหาเพลง ศิลปิน หรือเพลงดัง</span><input id="q" type="search" autocomplete="off" placeholder="ชื่อเพลง ศิลปิน หรือเพลงดัง" value="' + esc(S.q) + '"></label><div id="results"></div>';
+    renderResults();
+  } else if (v === 'lib') {
+    m.innerHTML = '<header class="hello"><h1>ไลบรารีของคุณ</h1></header><div class="tiles"><button type="button" class="tile" data-go="liked"><i class="cv heart">' + ic('heartfill', 22) + '</i><strong>เพลงที่ถูกใจ</strong></button><button type="button" class="tile" data-go="mine"><i class="cv files">' + ic('upload', 22) + '</i><strong>ไฟล์ของฉัน</strong></button></div><div class="sec-h"><h2>ศิลปิน</h2></div><div class="grid">' + ARTISTS.map(artistCard).join('') + '</div><div class="sec-h"><h2>เพลย์ลิสต์</h2></div><div class="grid">' + PLAYLISTS.map(plCard).join('') + '</div>';
+  } else if (v.indexOf('artist:') === 0) {
+    const a = ARTISTS.find(x => x.id === v.slice(7)); if (!a) { go('home'); return; }
+    loadArtist(a);
+    const st = ARTL[a.id], l = st ? st.list : [];
+    m.innerHTML = head('ศิลปิน', a.name, '', (st && st.loading ? 'กำลังโหลดเพลงทั้งหมด… · ' : '') + totalMeta(l), '<i class="cv" style="background-image:' + cover('ar' + a.id) + '"></i>') + actions(v, l.length) +
+      (l.length ? rows(l, v) : '<div class="empty"><strong>กำลังโหลด…</strong>กำลังดึงรายชื่อเพลงของศิลปิน</div>') +
+      (st && st.done && !st.err && l.length <= a.seeds.length ? '<p class="hint">ไม่พบเพลงเพิ่มเติมใน iTunes ลองพิมพ์ชื่อเพลงในหน้าค้นหา</p>' : '') +
+      (st && st.err ? '<p class="hint">ดึงรายชื่อเพลงเพิ่มไม่ได้ในตอนนี้ (อาจติดข้อจำกัดของ iTunes) ลองรีเฟรชหน้าแล้วเปิดอีกครั้ง</p>' : '');
+  } else if (v === 'liked') {
+    const l = listFor('liked');
+    m.innerHTML = head('เพลย์ลิสต์', 'เพลงที่ถูกใจ', '', totalMeta(l), '<i class="cv heart">' + ic('heartfill', 64) + '</i>') + actions('liked', l.length) +
+      (l.length ? rows(l, 'liked') : '<div class="empty"><strong>ยังไม่มีเพลงที่ถูกใจ</strong>กดรูปหัวใจข้างเพลงเพื่อเก็บไว้ที่นี่</div>');
+  } else if (v === 'mine') {
+    const l = S.uploads;
+    m.innerHTML = head('ไลบรารี', 'ไฟล์ของฉัน', '', l.length ? totalMeta(l) : 'ยังไม่มีไฟล์', '<i class="cv files">' + ic('upload', 64) + '</i>') + actions('mine', l.length) + (l.length ? rows(l, 'mine') : '') + dropZone;
+  } else if (v.indexOf('pl:') === 0) {
+    const p = PLAYLISTS.find(x => x.id === v.slice(3)); if (!p) { go('home'); return; }
+    const l = plTracks(p);
+    m.innerHTML = head('เพลย์ลิสต์', p.name, p.desc, totalMeta(l), '<i class="cv" style="background-image:' + cover(p.id) + '"></i>') + actions(v, l.length) + rows(l, v);
+  }
+  syncMarks();
+}
+function renderResults() {
+  const box = $('#results'); if (!box) return;
+  const q = S.q.trim();
+  if (!q) {
+    box.innerHTML = hitsSection('ชาร์ตเพลงไทย', 'Spotify · iTunes · วิทยุ', thHits(), true, 'hits-th') + hitNote + hitsSection('เพลงสากล · K-pop', 'Billboard · ชาร์ตไทย · ฮิตตลอดกาล', intlHits(), true, 'hits-intl') +
+      '<div class="sec-h"><h2>เลือกดูตามอารมณ์</h2></div><div class="grid">' + PLAYLISTS.map(plCard).join('') + '</div>';
+    return;
+  }
+  const l = searchResults(), hs = hitsFor(q), fl = S.foundQ === q ? S.found : [];
+  const nq = norm(q), ars = nq.length >= 2 ? ARTISTS.filter(a => a.match.some(m => m.indexOf(nq) >= 0 || nq.indexOf(m) >= 0)) : [];
+  box.innerHTML = (ars.length ? '<div class="sec-h"><h2>ศิลปิน</h2></div><div class="grid">' + ars.map(artistCard).join('') + '</div>' : '') + (fl.length ? '<div class="sec-h"><h2>ฟังตัวอย่างได้เลย</h2><span>iTunes · 30 วินาที</span></div>' + rows(fl, 'itunes') : '') + (l.length ? '<div class="sec-h"><h2>ในแอพ เล่นได้เลย</h2><span>' + l.length + ' เพลง</span></div>' + rows(l, 'search') : '') +
+    (hs.length ? '<div class="hits" style="margin-top:20px"><div class="sec-h"><h2>เพลงดัง</h2><span>' + hs.length + ' เพลง</span></div><div class="list">' + hs.map((h, i) => hitRow(h, i, false, 'hits-search')).join('') + '</div>' + hitNote + '</div>' : '') +
+    (!l.length && !hs.length && !fl.length && !ars.length ? '<div class="empty"><strong>ไม่พบ “' + esc(q) + '”</strong>ลองพิมพ์ชื่อศิลปิน เช่น GAVIN:D, Drake หรือชื่อเพลง</div>' : '');
+  syncMarks();
+}
+function syncMarks() {
+  scanArt();
+  document.querySelectorAll('.row').forEach(r => {
+    const cur = S.cur && r.getAttribute('data-id') === S.cur.id;  // hit rows carry no data-id
+    r.classList.toggle('is-cur', !!cur); r.classList.toggle('is-loading', !!cur && S.loading); r.classList.toggle('is-playing', !!cur && S.playing);
+  });
+}
+function renderPlayer() {
+  const t = S.cur;
+  $('#npTitle').textContent = t ? t.title : 'ยังไม่ได้เลือกเพลง';
+  $('#npArtist').textContent = t ? (S.loading ? (S.status || 'กำลังหาเสียง…') : t.artist + (t.yt ? ' · เต็มเพลงจาก YouTube' : t.remote ? ' · ตัวอย่าง 30 วิ' : '')) : 'กดเล่นเพลงใดก็ได้เพื่อเริ่ม';
+  $('#npCover').style.backgroundImage = t ? coverOf(t) : 'var(--logo)';
+  const nl = $('#npLike'); nl.style.visibility = t ? 'visible' : 'hidden';
+  if (t) { nl.setAttribute('data-like', t.id); nl.setAttribute('aria-pressed', fav(t.id)); nl.innerHTML = ic(fav(t.id) ? 'heartfill' : 'heart', 18); nl.className = 'like'; }
+  $('#bPlay').innerHTML = ic(S.playing ? 'pause' : 'play', 20);
+  $('#bPlay').setAttribute('aria-label', S.playing ? 'หยุดชั่วคราว' : 'เล่น');
+  $('#bPrev').innerHTML = ic('prev', 20); $('#bNext').innerHTML = ic('next', 20);
+  const sh = $('#bShuffle'); sh.innerHTML = ic('shuffle', 20); sh.classList.toggle('on', S.shuffle); sh.setAttribute('aria-pressed', S.shuffle);
+  const rp = $('#bRepeat'); rp.innerHTML = ic('repeat', 20) + (S.repeat === 2 ? '<span class="one">1</span>' : '');
+  rp.classList.toggle('on', S.repeat > 0); rp.setAttribute('aria-pressed', S.repeat > 0);
+  rp.setAttribute('aria-label', 'เล่นซ้ำ: ' + ['ปิด', 'ทั้งคิว', 'เพลงนี้']);
+  rp.setAttribute('aria-label', 'เล่นซ้ำ: ' + ['ปิด', 'ทั้งคิว', 'เพลงนี้'][S.repeat]);
+  document.documentElement.style.setProperty('--hue', t ? hueOf(t.id) : 215);
+}
+function syncAll() { renderPlayer(); syncMarks(); }
+function go(view) { S.view = view; renderSide(); renderMain(); $('#main').scrollTop = 0; if (view === 'search') { const q = $('#q'); if (q) q.focus(); } }
+
+/* progress loop */
+function tick() {
+  const dur = getDur(), pos = Math.min(getPos(), dur || 0);
+  if (!S.dragging) {
+    const r = $('#seek'); r.value = dur ? Math.round(pos / dur * 1000) : 0; r.style.setProperty('--p', (dur ? pos / dur * 100 : 0) + '%');
+    $('#tCur').textContent = fmt(pos);
+  }
+  $('#tDur').textContent = fmt(dur);
+  if (S.playing && S.cur && !S.cur.file && !S.cur.remote && dur > 0 && pos >= dur - 0.03 && !S.ending) { S.ending = true; step(1, true); }
+  requestAnimationFrame(tick);
+}
+
+/* ---------- uploads ---------- */
+function addFiles(files) {
+  const ok = Array.prototype.filter.call(files, f => /^audio\//.test(f.type) || /\.(mp3|m4a|aac|wav|ogg|flac|opus)$/i.test(f.name));
+  if (!ok.length) { toast('ไม่พบไฟล์เสียง ลองไฟล์ mp3, m4a, wav หรือ ogg'); return; }
+  ok.forEach(f => {
+    const t = { id: 'u' + (++uid), title: f.name.replace(/\.[^.]+$/, ''), artist: 'ไฟล์ของคุณ', tag: 'อัปโหลด', file: URL.createObjectURL(f), dur: 0 };
+    S.uploads.push(t);
+    const a = new Audio(); a.preload = 'metadata'; a.src = t.file;
+    a.addEventListener('loadedmetadata', () => { t.dur = a.duration; document.querySelectorAll('[data-dur="' + t.id + '"]').forEach(el => { el.textContent = fmt(t.dur); }); });
+  });
+  toast('เพิ่ม ' + ok.length + ' ไฟล์แล้ว');
+  go('mine');
+}
+
+/* ---------- เพิ่มเพลงด้วยลิงก์ (ไฟล์เสียงตรง ๆ หรือลิงก์ YouTube) ---------- */
+const URL_KEY = 'soundroom.urls';
+function urlsLoad() { try { return JSON.parse(localStorage.getItem(URL_KEY) || '[]'); } catch (e) { return []; } }
+function mkUrlTrack(x) {
+  const t = { id: x.id, title: x.title, artist: x.yt ? 'YouTube' : 'ลิงก์ของฉัน', tag: 'ลิงก์', dur: 0 };
+  if (x.yt) { t.yt = x.yt; t.remote = true; t.art = 'https://i.ytimg.com/vi/' + x.yt + '/mqdefault.jpg'; }
+  else {
+    t.file = x.url;
+    const a = new Audio(); a.preload = 'metadata'; a.src = t.file;
+    a.addEventListener('loadedmetadata', () => { t.dur = a.duration; document.querySelectorAll('[data-dur="' + t.id + '"]').forEach(el => { el.textContent = fmt(t.dur); }); });
+  }
+  return t;
+}
+function addByUrl() {
+  const u = (prompt('วางลิงก์เพลง\n• ไฟล์เสียงตรง ๆ เช่น https://.../song.mp3\n• หรือลิงก์ YouTube') || '').trim();
+  if (!u) return;
+  let url; try { url = new URL(u); } catch (e) { toast('ลิงก์ไม่ถูกต้อง'); return; }
+  const yt = (u.match(/(?:youtu\.be\/|[?&]v=|embed\/|shorts\/)([\w-]{11})/) || [])[1];
+  if (!yt && /(spotify|soundcloud|music\.apple|deezer)\./i.test(url.hostname)) { toast('ลิงก์หน้าเว็บของ Spotify/SoundCloud เล่นในแอพไม่ได้ ต้องเป็นลิงก์ไฟล์เสียงตรง ๆ หรือ YouTube'); return; }
+  if (!yt && url.protocol !== 'https:' && location.protocol === 'https:') { toast('ต้องเป็นลิงก์ https:// เท่านั้น'); return; }
+  const def = yt ? 'เพลงจาก YouTube' : decodeURIComponent(url.pathname.split('/').pop() || '').replace(/\.[^.]+$/, '') || 'เพลงจากลิงก์';
+  const title = (prompt('ตั้งชื่อเพลง', def) || def).trim() || def;
+  const x = { id: 'l' + Date.now(), title, url: u, yt: yt || '' };
+  const list = urlsLoad(); list.push(x);
+  try { localStorage.setItem(URL_KEY, JSON.stringify(list)); } catch (e) {}
+  S.uploads.push(mkUrlTrack(x)); toast('เพิ่มเพลงแล้ว'); go('mine');
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const t = e.target;
+  const lk = t.closest('[data-like]');
+  if (lk) { const id = lk.getAttribute('data-like'); S.liked.has(id) ? S.liked.delete(id) : S.liked.add(id); saveLiked(); lmSync(id); renderSide(); if (S.view === 'liked') renderMain(); else { document.querySelectorAll('[data-like="' + id + '"]').forEach(b => { b.setAttribute('aria-pressed', fav(id)); b.setAttribute('aria-label', fav(id) ? 'เลิกถูกใจ' : 'ถูกใจ'); b.innerHTML = ic(fav(id) ? 'heartfill' : 'heart', 18); }); } renderPlayer(); return; }
+  const g = t.closest('[data-go]'); if (g) { go(g.getAttribute('data-go')); return; }
+  const pc = t.closest('[data-playctx]'); if (pc) { const c = pc.getAttribute('data-playctx'), l = listFor(c); if (l.length) { S.shuffle = false; playTrack(l[0].id, c); } return; }
+  const sc = t.closest('[data-shuffle-ctx]'); if (sc) { const c = sc.getAttribute('data-shuffle-ctx'), l = listFor(c); if (l.length) { S.shuffle = true; playTrack(l[Math.floor(Math.random() * l.length)].id, c); } return; }
+  if (t.closest('[data-pick]')) { $('#file').click(); return; }
+  if (t.closest('[data-addurl]')) { addByUrl(); return; }
+  if (t.closest('[data-clearurls]')) {
+    try { localStorage.removeItem(URL_KEY); } catch (x) {}
+    S.uploads = S.uploads.filter(u => u.id.charAt(0) !== 'l'); toast('ล้างลิงก์ที่เพิ่มแล้ว'); renderSide(); renderMain(); return;
+  }
+  if (t.closest('[data-ytkey]')) { ytKeyAsk(); return; }
+  if (t.closest('[data-srcsw]')) {
+    const nv = srcGet() === 'yt' ? 'it' : 'yt'; srcSet(nv);
+    if (nv === 'it') { HITS.concat(Object.keys(REG).map(k => REG[k])).forEach(x => { x.yt = null; }); ytStop(); ytCur = ''; }
+    else HITS.concat(Object.keys(REG).map(k => REG[k])).forEach(x => { x.tried = false; });
+    toast(nv === 'it' ? 'ใช้ตัวอย่าง 30 วิจาก iTunes (ไม่มีโฆษณา)' : 'ใช้เต็มเพลงจาก YouTube (อาจมีโฆษณา)');
+    if (S.cur && S.cur.remote && S.playing) playTrack(S.cur.id);
+    return;
+  }
+  if (t.closest('a.open')) return;
+  const r = t.closest('.row'); if (r) { const id = r.getAttribute('data-id'); if (S.cur && S.cur.id === id) togglePlay(); else playTrack(id, r.getAttribute('data-ctx')); }
+});
+document.addEventListener('keydown', e => {
+  if (e.target.classList && e.target.classList.contains('row') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.target.click(); return; }
+  if (e.code === 'Space' && !/^(INPUT|BUTTON|TEXTAREA)$/.test(e.target.tagName) && !(e.target.classList && e.target.classList.contains('row')) && e.target.tagName !== 'A') { e.preventDefault(); togglePlay(); }
+});
+let lsT;
+function liveSearch() {
+  clearTimeout(lsT);
+  const q = S.q.trim();
+  if (q.length < 2) { S.found = []; S.foundQ = ''; return; }
+  lsT = setTimeout(async () => {
+    try { const res = await itunes(q, 10, 'TH', true); if (S.q.trim() !== q) return; S.found = res.map(toTrack); }
+    catch (e) { if (S.q.trim() !== q) return; S.found = []; }
+    S.foundQ = q; renderResults();
+  }, 450);
+}
+document.addEventListener('input', e => { if (e.target.id === 'q') { S.q = e.target.value; renderResults(); liveSearch(); } });
+$('#bPlay').addEventListener('click', togglePlay);
+$('#bNext').addEventListener('click', () => step(1, false));
+$('#bPrev').addEventListener('click', prevTrack);
+$('#bShuffle').addEventListener('click', () => { S.shuffle = !S.shuffle; renderPlayer(); });
+$('#bRepeat').addEventListener('click', () => { S.repeat = (S.repeat + 1) % 3; renderPlayer(); });
+$('#bMute').addEventListener('click', () => { S.muted = !S.muted; setVolume(); });
+$('#vol').addEventListener('input', e => { S.vol = e.target.value / 100; S.muted = false; setVolume(); });
+const sk = $('#seek');
+sk.addEventListener('input', () => { S.dragging = true; const d = getDur(); sk.style.setProperty('--p', sk.value / 10 + '%'); $('#tCur').textContent = fmt(sk.value / 1000 * d); });
+sk.addEventListener('change', () => { seekTo(sk.value / 1000 * getDur()); S.dragging = false; });
+$('#addBtn').innerHTML = ic('plus', 18);
+$('#addBtn').addEventListener('click', () => $('#file').click());
+$('#file').addEventListener('change', e => { addFiles(e.target.files); e.target.value = ''; });
+['dragover', 'dragenter'].forEach(ev => window.addEventListener(ev, e => { e.preventDefault(); const d = $('#drop'); if (d) d.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => window.addEventListener(ev, e => { const d = $('#drop'); if (d) d.classList.remove('over'); }));
+window.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+
+/* ปลดล็อกเสียงบนมือถือ: เบราว์เซอร์มือถือยอมให้เล่นเสียงหลังรอโหลดได้ ก็ต่อเมื่อเคยเล่นเสียงจากการแตะมาก่อน */
+document.addEventListener('click', function () {
+  try {
+    if (S.cur) return;
+    audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
+    const p = audio.play(); if (p && p.catch) p.catch(() => {});
+    audio.setAttribute('data-id', '');
+  } catch (e) {}
+}, { once: true, capture: true });
+
+/* ---------- เพลงของคุณเองใน repo: วางไฟล์ในโฟลเดอร์ music/ แล้วระบุใน songs.json ---------- */
+function loadLibrary() {
+  fetch('songs.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).then(list => {
+    if (!Array.isArray(list) || !list.length) return;
+    const ids = [];
+    list.forEach((x, i) => {
+      if (!x || !x.file) return;
+      const t = { id: 's' + i, title: x.title || String(x.file).replace(/^.*\//, '').replace(/\.[^.]+$/, ''), artist: x.artist || 'เพลงของฉัน', tag: x.album || 'เพลงของฉัน', file: encodeURI(x.file), dur: 0 };
+      if (x.cover) t.art = encodeURI(x.cover);
+      TRACKS.push(t); ids.push(t.id);
+      const a = new Audio(); a.preload = 'metadata'; a.src = t.file;
+      a.addEventListener('loadedmetadata', () => { t.dur = a.duration; document.querySelectorAll('[data-dur="' + t.id + '"]').forEach(el => { el.textContent = fmt(t.dur); }); });
+    });
+    if (!ids.length) return;
+    PLAYLISTS.unshift({ id: 'p0', name: 'เพลงของฉัน', desc: 'เพลงที่เก็บไว้ในเว็บนี้ เล่นได้ทุกอุปกรณ์ ไม่มีโฆษณา', ids });
+    renderSide(); renderMain();
+  }).catch(() => {});
+}
+
+/* ---------- boot ---------- */
+try { const m = /url\(["']?(.*?)["']?\)/.exec(getComputedStyle(document.documentElement).getPropertyValue('--logo')); if (m) { const l = document.createElement('link'); l.rel = 'icon'; l.href = m[1]; document.head.appendChild(l); } } catch (e) {}
+(function () {
+  const m = lmLoad();
+  Object.keys(m).forEach(id => {
+    if (!S.liked.has(id) || REG[id] || byId(id)) return;
+    const x = m[id];
+    REG[id] = { id, title: x.title, artist: x.artist, tag: x.tag, remote: true, file: x.file || null, yt: srcGet() === 'yt' ? (x.yt || null) : null, dur: 30, art: x.art || undefined };
+  });
+})();
+urlsLoad().forEach(x => { if (x && x.id && x.title) S.uploads.push(mkUrlTrack(x)); });
+setVolume(); renderSide(); renderMain(); renderPlayer(); requestAnimationFrame(tick); loadLibrary();
+})();
+</script>
+
+</body></html>
