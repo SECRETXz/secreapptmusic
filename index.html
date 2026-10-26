@@ -721,7 +721,10 @@ function ytErr() {
   toast(location.protocol === 'file:' ? 'YouTube ไม่ยอมเล่นจากไฟล์ที่เปิดตรง ๆ ให้รันผ่าน localhost จึงจะฟังเต็มเพลงได้' : 'วิดีโอนี้ฝังเล่นไม่ได้ ใช้ตัวอย่าง 30 วิแทน');
   playTrack(t.id);
 }
-const YT_DEFAULT_KEY = 'AIzaSyAjX2Zsy2B9iEScBqwP3Hlk4gFycwxjSD0'; // คีย์เริ่มต้น (ผู้ใช้เปลี่ยนเองได้ที่ปุ่ม "ตั้งค่า YouTube")
+/* แหล่งเสียง: 'yt' = เต็มเพลงจาก YouTube (อาจมีโฆษณา) | 'it' = ตัวอย่าง 30 วิจาก iTunes (ไม่มีโฆษณา เล่นบนมือถือได้ดีกว่า) */
+const srcGet = () => { let v = ''; try { v = localStorage.getItem('soundroom.src') || ''; } catch (e) {} if (v === 'yt' || v === 'it') return v; try { return matchMedia('(pointer:coarse)').matches ? 'it' : 'yt'; } catch (e) { return 'yt'; } };
+const srcSet = v => { try { localStorage.setItem('soundroom.src', v); } catch (e) {} };
+const YT_DEFAULT_KEY ='AIzaSyAjX2Zsy2B9iEScBqwP3Hlk4gFycwxjSD0'; // คีย์เริ่มต้น (ผู้ใช้เปลี่ยนเองได้ที่ปุ่ม "ตั้งค่า YouTube")
 const ytKeyGet = () => { let k = ''; try { k = localStorage.getItem('soundroom.ytkey') || ''; } catch (e) {} return k || YT_DEFAULT_KEY; };
 function ytCacheGet() { try { return JSON.parse(localStorage.getItem('soundroom.yt') || '{}'); } catch (e) { return {}; } }
 function ytCacheSave(c) { try { localStorage.setItem('soundroom.yt', JSON.stringify(c)); } catch (e) {} }
@@ -800,8 +803,9 @@ function toTrack(r) {
   return REG[id] || (REG[id] = { id, title: r.trackName, artist: r.artistName, tag: r.collectionName || 'iTunes', remote: true, file: r.previewUrl, dur: 30, art: artOf(r) });
 }
 async function resolvePreview(t) {
-  if (t.yt) return true;
-  if (!t.tried) { t.tried = true; if (await resolveYT(t)) return true; }
+  const useYT = srcGet() === 'yt';
+  if (t.yt && useYT) return true;
+  if (useYT && !t.tried) { t.tried = true; if (await resolveYT(t)) return true; }
   if (t.file) return true;
   if (t.pv) { t.file = t.pv; t.dur = 30; return true; }
   S.status = 'กำลังหาตัวอย่างเสียงจาก iTunes…'; renderPlayer();
@@ -883,7 +887,7 @@ function setVolume() {
   $('#bMute').innerHTML = ic(S.muted || S.vol === 0 ? 'mute' : 'vol');
   $('#bMute').setAttribute('aria-label', S.muted ? 'เปิดเสียง' : 'ปิดเสียง');
 }
-audio.addEventListener('ended', () => { if (S.cur && S.cur.file && !S.ending) { S.ending = true; step(1, true); } });
+audio.addEventListener('ended', () => { if (S.cur && S.cur.file && audio.getAttribute('data-id') === S.cur.id && !S.ending) { S.ending = true; step(1, true); } });
 audio.addEventListener('loadedmetadata', () => { if (S.cur && S.cur.file && isFinite(audio.duration)) { S.cur.dur = audio.duration; } });
 
 function mediaMeta() {
@@ -917,7 +921,7 @@ function hitsSection(title, sub, list, rank, ctx) {
 }
 const thHits = () => HITS.filter(h => h.th), intlHits = () => HITS.filter(h => !h.th);
 function hitsFor(q) { q = q.trim().toLowerCase(); return HITS.filter(h => (h.title + ' ' + h.artist + ' ' + h.src).toLowerCase().indexOf(q) >= 0); }
-const hitNote = '<p class="hint">กดเล่นเพื่อฟังในแอพ ถ้าใส่ YouTube API key จะเล่นเต็มเพลง ถ้าไม่ใส่จะได้ตัวอย่าง 30 วินาทีจาก iTunes <button type="button" class="ghost" data-ytkey>ตั้งค่า YouTube</button></p>';
+const hitNote = '<p class="hint">กดเล่นเพื่อฟังในแอพ ถ้าใส่ YouTube API key จะเล่นเต็มเพลง ถ้าไม่ใส่จะได้ตัวอย่าง 30 วินาทีจาก iTunes <button type="button" class="ghost" data-srcsw>สลับ: YouTube เต็มเพลง ⇄ iTunes ไม่มีโฆษณา</button> <button type="button" class="ghost" data-ytkey>ตั้งค่า YouTube</button></p>';
 const rows = (list, ctx) => '<div class="list" role="list">' + list.map((t, i) => row(t, i, ctx)).join('') + '</div>';
 const navItems = [['home', 'home', 'หน้าแรก'], ['search', 'search', 'ค้นหา'], ['lib', 'lib', 'ไลบรารี']];
 
@@ -943,7 +947,7 @@ function actions(ctx, count) {
   return count ? '<div class="acts"><button type="button" class="big" data-playctx="' + ctx + '" aria-label="เล่นทั้งหมด">' + ic('play', 26) + '</button><button type="button" class="ghost" data-shuffle-ctx="' + ctx + '">' + ic('shuffle', 18) + 'สุ่มเล่น</button></div>' : '';
 }
 function totalMeta(list) { const m = Math.round(list.reduce((a, t) => a + durOf(t), 0) / 60); return list.length + ' เพลง' + (m ? ' · ประมาณ ' + m + ' นาที' : ''); }
-const dropZone = '<div class="drop" id="drop"><strong>ลากไฟล์เพลงมาวางที่นี่</strong>รองรับ mp3, m4a, wav, ogg ไฟล์จะอยู่ในหน้านี้จนกว่าจะปิดแท็บ<div style="margin-top:14px"><button type="button" class="ghost" data-pick>' + ic('plus', 18) + 'เลือกไฟล์</button></div></div>';
+const dropZone = '<div class="drop" id="drop"><strong>ลากไฟล์เพลงมาวางที่นี่</strong>รองรับ mp3, m4a, wav, ogg ไฟล์จะอยู่ในหน้านี้จนกว่าจะปิดแท็บ<div style="margin-top:14px"><button type="button" class="ghost" data-pick>' + ic('plus', 18) + 'เลือกไฟล์</button> <button type="button" class="ghost" data-addurl>' + ic('plus', 18) + 'เพิ่มด้วยลิงก์</button> <button type="button" class="ghost" data-clearurls>ล้างลิงก์ที่เพิ่ม</button></div></div>';
 
 function renderMain() {
   const m = $('#main'), v = S.view;
@@ -1051,6 +1055,34 @@ function addFiles(files) {
   go('mine');
 }
 
+/* ---------- เพิ่มเพลงด้วยลิงก์ (ไฟล์เสียงตรง ๆ หรือลิงก์ YouTube) ---------- */
+const URL_KEY = 'soundroom.urls';
+function urlsLoad() { try { return JSON.parse(localStorage.getItem(URL_KEY) || '[]'); } catch (e) { return []; } }
+function mkUrlTrack(x) {
+  const t = { id: x.id, title: x.title, artist: x.yt ? 'YouTube' : 'ลิงก์ของฉัน', tag: 'ลิงก์', dur: 0 };
+  if (x.yt) { t.yt = x.yt; t.remote = true; t.art = 'https://i.ytimg.com/vi/' + x.yt + '/mqdefault.jpg'; }
+  else {
+    t.file = x.url;
+    const a = new Audio(); a.preload = 'metadata'; a.src = t.file;
+    a.addEventListener('loadedmetadata', () => { t.dur = a.duration; document.querySelectorAll('[data-dur="' + t.id + '"]').forEach(el => { el.textContent = fmt(t.dur); }); });
+  }
+  return t;
+}
+function addByUrl() {
+  const u = (prompt('วางลิงก์เพลง\n• ไฟล์เสียงตรง ๆ เช่น https://.../song.mp3\n• หรือลิงก์ YouTube') || '').trim();
+  if (!u) return;
+  let url; try { url = new URL(u); } catch (e) { toast('ลิงก์ไม่ถูกต้อง'); return; }
+  const yt = (u.match(/(?:youtu\.be\/|[?&]v=|embed\/|shorts\/)([\w-]{11})/) || [])[1];
+  if (!yt && /(spotify|soundcloud|music\.apple|deezer)\./i.test(url.hostname)) { toast('ลิงก์หน้าเว็บของ Spotify/SoundCloud เล่นในแอพไม่ได้ ต้องเป็นลิงก์ไฟล์เสียงตรง ๆ หรือ YouTube'); return; }
+  if (!yt && url.protocol !== 'https:' && location.protocol === 'https:') { toast('ต้องเป็นลิงก์ https:// เท่านั้น'); return; }
+  const def = yt ? 'เพลงจาก YouTube' : decodeURIComponent(url.pathname.split('/').pop() || '').replace(/\.[^.]+$/, '') || 'เพลงจากลิงก์';
+  const title = (prompt('ตั้งชื่อเพลง', def) || def).trim() || def;
+  const x = { id: 'l' + Date.now(), title, url: u, yt: yt || '' };
+  const list = urlsLoad(); list.push(x);
+  try { localStorage.setItem(URL_KEY, JSON.stringify(list)); } catch (e) {}
+  S.uploads.push(mkUrlTrack(x)); toast('เพิ่มเพลงแล้ว'); go('mine');
+}
+
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
   const t = e.target;
@@ -1060,7 +1092,20 @@ document.addEventListener('click', e => {
   const pc = t.closest('[data-playctx]'); if (pc) { const c = pc.getAttribute('data-playctx'), l = listFor(c); if (l.length) { S.shuffle = false; playTrack(l[0].id, c); } return; }
   const sc = t.closest('[data-shuffle-ctx]'); if (sc) { const c = sc.getAttribute('data-shuffle-ctx'), l = listFor(c); if (l.length) { S.shuffle = true; playTrack(l[Math.floor(Math.random() * l.length)].id, c); } return; }
   if (t.closest('[data-pick]')) { $('#file').click(); return; }
+  if (t.closest('[data-addurl]')) { addByUrl(); return; }
+  if (t.closest('[data-clearurls]')) {
+    try { localStorage.removeItem(URL_KEY); } catch (x) {}
+    S.uploads = S.uploads.filter(u => u.id.charAt(0) !== 'l'); toast('ล้างลิงก์ที่เพิ่มแล้ว'); renderSide(); renderMain(); return;
+  }
   if (t.closest('[data-ytkey]')) { ytKeyAsk(); return; }
+  if (t.closest('[data-srcsw]')) {
+    const nv = srcGet() === 'yt' ? 'it' : 'yt'; srcSet(nv);
+    if (nv === 'it') { HITS.concat(Object.keys(REG).map(k => REG[k])).forEach(x => { x.yt = null; }); ytStop(); ytCur = ''; }
+    else HITS.concat(Object.keys(REG).map(k => REG[k])).forEach(x => { x.tried = false; });
+    toast(nv === 'it' ? 'ใช้ตัวอย่าง 30 วิจาก iTunes (ไม่มีโฆษณา)' : 'ใช้เต็มเพลงจาก YouTube (อาจมีโฆษณา)');
+    if (S.cur && S.cur.remote && S.playing) playTrack(S.cur.id);
+    return;
+  }
   if (t.closest('a.open')) return;
   const r = t.closest('.row'); if (r) { const id = r.getAttribute('data-id'); if (S.cur && S.cur.id === id) togglePlay(); else playTrack(id, r.getAttribute('data-ctx')); }
 });
@@ -1097,6 +1142,35 @@ $('#file').addEventListener('change', e => { addFiles(e.target.files); e.target.
 ['dragleave', 'drop'].forEach(ev => window.addEventListener(ev, e => { const d = $('#drop'); if (d) d.classList.remove('over'); }));
 window.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
 
+/* ปลดล็อกเสียงบนมือถือ: เบราว์เซอร์มือถือยอมให้เล่นเสียงหลังรอโหลดได้ ก็ต่อเมื่อเคยเล่นเสียงจากการแตะมาก่อน */
+document.addEventListener('click', function () {
+  try {
+    if (S.cur) return;
+    audio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
+    const p = audio.play(); if (p && p.catch) p.catch(() => {});
+    audio.setAttribute('data-id', '');
+  } catch (e) {}
+}, { once: true, capture: true });
+
+/* ---------- เพลงของคุณเองใน repo: วางไฟล์ในโฟลเดอร์ music/ แล้วระบุใน songs.json ---------- */
+function loadLibrary() {
+  fetch('songs.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : []).then(list => {
+    if (!Array.isArray(list) || !list.length) return;
+    const ids = [];
+    list.forEach((x, i) => {
+      if (!x || !x.file) return;
+      const t = { id: 's' + i, title: x.title || String(x.file).replace(/^.*\//, '').replace(/\.[^.]+$/, ''), artist: x.artist || 'เพลงของฉัน', tag: x.album || 'เพลงของฉัน', file: encodeURI(x.file), dur: 0 };
+      if (x.cover) t.art = encodeURI(x.cover);
+      TRACKS.push(t); ids.push(t.id);
+      const a = new Audio(); a.preload = 'metadata'; a.src = t.file;
+      a.addEventListener('loadedmetadata', () => { t.dur = a.duration; document.querySelectorAll('[data-dur="' + t.id + '"]').forEach(el => { el.textContent = fmt(t.dur); }); });
+    });
+    if (!ids.length) return;
+    PLAYLISTS.unshift({ id: 'p0', name: 'เพลงของฉัน', desc: 'เพลงที่เก็บไว้ในเว็บนี้ เล่นได้ทุกอุปกรณ์ ไม่มีโฆษณา', ids });
+    renderSide(); renderMain();
+  }).catch(() => {});
+}
+
 /* ---------- boot ---------- */
 try { const m = /url\(["']?(.*?)["']?\)/.exec(getComputedStyle(document.documentElement).getPropertyValue('--logo')); if (m) { const l = document.createElement('link'); l.rel = 'icon'; l.href = m[1]; document.head.appendChild(l); } } catch (e) {}
 (function () {
@@ -1104,10 +1178,11 @@ try { const m = /url\(["']?(.*?)["']?\)/.exec(getComputedStyle(document.document
   Object.keys(m).forEach(id => {
     if (!S.liked.has(id) || REG[id] || byId(id)) return;
     const x = m[id];
-    REG[id] = { id, title: x.title, artist: x.artist, tag: x.tag, remote: true, file: x.file || null, yt: x.yt || null, dur: 30, art: x.art || undefined };
+    REG[id] = { id, title: x.title, artist: x.artist, tag: x.tag, remote: true, file: x.file || null, yt: srcGet() === 'yt' ? (x.yt || null) : null, dur: 30, art: x.art || undefined };
   });
 })();
-setVolume(); renderSide(); renderMain(); renderPlayer(); requestAnimationFrame(tick);
+urlsLoad().forEach(x => { if (x && x.id && x.title) S.uploads.push(mkUrlTrack(x)); });
+setVolume(); renderSide(); renderMain(); renderPlayer(); requestAnimationFrame(tick); loadLibrary();
 })();
 </script>
 
