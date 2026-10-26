@@ -336,7 +336,7 @@ function render(){
     const h = new Date().getHours();
     main.innerHTML = `<h1>${h<12?"อรุณสวัสดิ์":h<18?"สวัสดียามบ่าย":"สวัสดีตอนค่ำ"}, ${esc(users()[user]?.name||"")}</h1>` + (songs.length?`<div class="act" style="margin:-6px 0 18px"><button class="btn" data-fx="shuffle">🔀 สุ่มเล่นทั้งคลัง</button></div>`:"") + recentBlock() +
       (P.length||liked.size ? `<div class="cards"><button class="card" data-v="liked"><span class="cov" style="--h:340">♥</span><b>เพลงที่ถูกใจ</b></button>${P.map(p=>`<button class="card" data-v="pl" data-id="${p.id}"><span class="cov" style="--h:${hue(p.name)}">${esc(ini(p.name))}</span><b>${esc(p.name)}</b></button>`).join("")}</div>` : "") +
-      `<h3>เพลงทั้งหมดในคลัง · แยกตามศิลปิน</h3>` + (songs.length ? groupedRows() : emptyLib);
+      `<h3>เพลงทั้งหมดในแอพ · แยกตามศิลปิน</h3>` + (songs.length ? groupedRows() : emptyLib);
   } else if(v==="search"){
     main.innerHTML = `<h1>ค้นหา</h1><input class="search" id="q" type="search" placeholder="ชื่อเพลงหรือศิลปิน" autofocus><div id="res" style="margin-top:16px"></div>`;
     const go = () => { const q=$("#q").value.trim().toLowerCase(); const r=songs.filter(s=>(s.title+" "+s.artist).toLowerCase().includes(q)).map(s=>s.id);
@@ -618,7 +618,7 @@ setInterval(()=>{ if(user && !au.paused){ PF.secs+=5; savePF(); } },5000);
 /* ---------- ลืมรหัสผ่าน + OTP ---------- */
 /* ตั้งค่าส่งอีเมลผ่าน EmailJS (emailjs.com) — ถ้าเว้นว่างไว้ จะเป็น "โหมดทดสอบ" แสดงรหัส OTP บนหน้าจอแทน
    เทมเพลตอีเมลใช้ตัวแปร {{to_email}} {{otp}} {{username}} {{minutes}} */
-const MAIL = { publicKey:"", serviceId:"service_y689cqh", templateId:"" };
+const MAIL = { publicKey:"AIIgr3yWS3vrpyHu2", serviceId:"service_7og4h1e", templateId:"template_2gbo5v6" };
 /* ถ้ามี backend OTP (โฟลเดอร์ otp-server) ใส่ URL ตรงนี้ เช่น "https://otp.example.com" — จะใช้ backend ก่อนเสมอ */
 const OTP_API = "";
 async function api(path, body){ let r; try{ r = await fetch(OTP_API+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }catch(e){ throw "เชื่อมต่อเซิร์ฟเวอร์ OTP ไม่ได้"; }
