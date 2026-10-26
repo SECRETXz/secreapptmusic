@@ -720,7 +720,8 @@ function ytErr() {
   toast(location.protocol === 'file:' ? 'YouTube ไม่ยอมเล่นจากไฟล์ที่เปิดตรง ๆ ให้รันผ่าน localhost จึงจะฟังเต็มเพลงได้' : 'วิดีโอนี้ฝังเล่นไม่ได้ ใช้ตัวอย่าง 30 วิแทน');
   playTrack(t.id);
 }
-const ytKeyGet = () => { try { return localStorage.getItem('soundroom.ytkey') || YT_DEFAULT_KEY; } catch (e) { return YT_DEFAULT_KEY; } };
+const YT_DEFAULT_KEY = 'AIzaSyAjX2Zsy2B9iEScBqwP3Hlk4gFycwxjSD0'; // คีย์เริ่มต้น (ผู้ใช้เปลี่ยนเองได้ที่ปุ่ม "ตั้งค่า YouTube")
+const ytKeyGet = () => { let k = ''; try { k = localStorage.getItem('soundroom.ytkey') || ''; } catch (e) {} return k || YT_DEFAULT_KEY; };
 function ytCacheGet() { try { return JSON.parse(localStorage.getItem('soundroom.yt') || '{}'); } catch (e) { return {}; } }
 function ytCacheSave(c) { try { localStorage.setItem('soundroom.yt', JSON.stringify(c)); } catch (e) {} }
 function ytKeyAsk() {
@@ -833,6 +834,10 @@ function playTrack(id, ctx) {
       if (ok) { if (!t.yt && t.failed === 'yt') toast('ใช้ YouTube ไม่ได้ (เช็กคีย์หรือโควตา) เล่นตัวอย่าง 30 วิแทน'); if (S.playing) engineStart(t, 0); }
       else { S.playing = false; toast(t.failed === 'net' ? (location.protocol === 'file:' ? 'เรียกเน็ตไม่ได้ ลองรันผ่าน localhost (ดูวิธีในแชท) แทนการดับเบิลคลิกไฟล์' : 'เรียกเน็ตไม่ได้ อาจถูกบล็อกหรือไม่มีอินเทอร์เน็ต') : 'ไม่พบตัวอย่างเสียงของเพลงนี้'); }
       syncAll();
+    }).catch(() => {
+      if (rq !== S.req) return;
+      S.loading = false; S.playing = false; syncAll();
+      toast('เล่นเพลงนี้ไม่ได้ ลองเพลงอื่นหรือเช็กอินเทอร์เน็ต');
     });
     return;
   }
